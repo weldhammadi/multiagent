@@ -1,0 +1,66 @@
+FORMAT EXACT POUR TEXT-TO-SPEECH - SUIT CETTE STRUCTURE:
+```python
+from groq import Groq
+import os
+import base64
+
+def generate_speech(text, voice="alloy", speed=1.0, output_format="mp3"):
+    """
+    Génère un fichier audio depuis du texte en utilisant PlayAI TTS.
+    
+    Args:
+        text: Texte à convertir en parole (str)
+        voice: Nom de la voix à utiliser (str)
+        speed: Vitesse de parole (0.25 à 4.0, défaut 1.0)
+        output_format: Format audio de sortie ('mp3', 'opus', 'aac', 'flac')
+    
+    Returns:
+        dict avec clés:
+            - audio_base64: Audio encodé en base64
+            - format: Format du fichier audio
+            - text_length: Nombre de caractères du texte
+            - voice_used: Voix utilisée
+    """
+    # Step 1: Validate input
+    if not isinstance(text, str) or len(text) == 0:
+        raise ValueError("text must be non-empty string")
+    
+    if not 0.25 <= speed <= 4.0:
+        raise ValueError("speed must be between 0.25 and 4.0")
+    
+    # Step 2: Get API key
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("GROQ_API_KEY not set")
+    
+    # Step 3: Create Groq client
+    client = Groq(api_key=api_key)
+    
+    # Step 4: Generate speech
+    response = client.audio.speech.create(
+        model="playai-tts",
+        input=text,
+        voice=voice,
+        speed=speed,
+        response_format=output_format
+    )
+    
+    # Step 5: Encode audio to base64
+    audio_bytes = response.content
+    audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
+    
+    # Step 6: Return structured result
+    return {
+        "audio_base64": audio_base64,
+        "format": output_format,
+        "text_length": len(text),
+        "voice_used": voice
+    }
+```
+
+RÈGLES CRITIQUES TEXT-TO-SPEECH:
+- Utiliser client.audio.speech.create()
+- Model DOIT être "playai-tts"
+- Valider la vitesse (0.25-4.0)
+- Encoder l'audio en base64 pour le retour
+- Supporter les formats: mp3, opus, aac, flac

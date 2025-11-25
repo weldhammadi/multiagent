@@ -1,0 +1,14 @@
+INSTRUCTIONS STRICTES:
+1. La fonction DOIT utiliser Groq API avec le modèle "openai/gpt-oss-120b"
+2. Importe TOUJOURS: from groq import Groq et import os
+3. Récupère la clé API UNIQUEMENT avec: os.getenv("GROQ_API_KEY")
+4. Initialise le client Groq: client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+5. Appelle TOUJOURS le modèle: model="openai/gpt-oss-120b"
+6. Les paramètres d'entrée doivent être passés à la FONCTION, pas au client Groq
+7. La fonction doit être autonome et complète
+8. Elle doit inclure une docstring complète
+9. Elle doit valider les entrées
+10. Elle doit retourner un dictionnaire avec exactement les clés spécifiées
+11. Le code doit être optimisé et sécurisé
+12. Pas d'imports externes dangereux autres que groq
+13. Aucun appel à subprocess, eval, exec

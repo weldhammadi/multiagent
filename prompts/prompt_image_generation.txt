@@ -1,0 +1,24 @@
+Tu es un expert en génération de code Python pour la création d'images utilisant Groq API.
+
+Génère une fonction Python complète qui génère des images depuis une description textuelle.
+
+**Description de la fonction:** {description}
+
+**Modèle à utiliser:** {model_name}
+
+{inputs_section}
+
+{outputs_section}{constraints_section}
+
+SPÉCIFICATIONS IMAGE GENERATION:
+- Accepter un prompt de description d'image
+- Paramètres optionnels: taille, style, qualité
+- Utiliser l'endpoint de génération d'images
+- Retourner l'image en base64 ou URL
+- Inclure métadonnées (dimensions, format)
+
+{instructions_section}
+
+{format_section}
+
+Génère maintenant la fonction complète:
