@@ -1,0 +1,15 @@
+from gtts import gTTS
+import os
+
+# Exemple de texte long
+texte = """
+Bonjour Oussama, ceci est un exemple de texte plus long pour démontrer la génération vocale avec gTTS.
+Tu peux mettre plusieurs phrases, paragraphes, et même plusieurs pages de texte.
+Le module gTTS va convertir tout le texte en un seul fichier audio au format MP3.
+"""
+
+# Créer le fichier audio
+tts = gTTS(text=texte, lang='fr')
+tts.save("audio_long.mp3")
+
+print("Fichier audio créé : audio_long.mp3")
