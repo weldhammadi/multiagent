@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+import shutil
+import tempfile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
@@ -6,7 +8,7 @@ import logging
 
 from interpretation_service.domain.models import RawInput, AgentRequest
 from interpretation_service.application.services.request_interpreter import RequestInterpreterService
-from interpretation_service.infrastructure.stt.mock_stt import MockSTTProvider
+from interpretation_service.infrastructure.stt.groq_stt import GroqSTTProvider
 from interpretation_service.infrastructure.llm.langchain_groq_llm import LangChainGroqLLMProvider
 from interpretation_service.infrastructure.bus.mock_bus import MockMessageBus
 from interpretation_service.infrastructure.logging_config import configure_logging
@@ -43,6 +45,8 @@ from interpretation_service.interfaces.api.chat_api import router as chat_router
 app.include_router(chat_router)
 
 # Modèles Pydantic pour l'API
+# Note: InterpretRequest n'est plus utilisé directement pour l'endpoint multipart
+# mais on le garde si on veut un endpoint JSON pur plus tard.
 class InterpretRequest(BaseModel):
     user_id: str
     text: str
@@ -57,19 +61,35 @@ class InterpretResponse(BaseModel):
 # Instanciation du service (Singleton pour l'instant)
 # Dans un vrai contexte, on utiliserait l'injection de dépendances
 service = RequestInterpreterService(
-    stt_provider=MockSTTProvider(),
+    stt_provider=GroqSTTProvider(),
     llm_provider=LangChainGroqLLMProvider(),
     bus_publisher=MockMessageBus(),
 )
 
 @app.post("/interpret", response_model=InterpretResponse)
-async def interpret(request: InterpretRequest):
-    logger.info(f"Received interpretation request from user {request.user_id}")
+async def interpret(
+    user_id: str = Form(...),
+    text: Optional[str] = Form(None),
+    conversation_id: Optional[str] = Form(None),
+    turn_index: Optional[int] = Form(None),
+    audio_file: Optional[UploadFile] = File(None),
+):
+    logger.info(f"Received interpretation request from user {user_id}")
     
+    raw_audio_path = None
+    if audio_file:
+        # Save uploaded file to temp
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{audio_file.filename}") as tmp:
+            shutil.copyfileobj(audio_file.file, tmp)
+            raw_audio_path = tmp.name
+        logger.info(f"Audio file saved to {raw_audio_path}")
+
     raw_input = RawInput(
-        user_id=request.user_id,
-        raw_text=request.text,
-        metadata=request.metadata
+        user_id=user_id,
+        raw_text=text,
+        raw_audio_url=raw_audio_path,
+        conversation_id=conversation_id,
+        turn_index=turn_index,
     )
     
     try:

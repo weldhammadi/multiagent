@@ -1,4 +1,7 @@
 import logging
+from typing import Optional
+
+from interpretation_service.infrastructure.memory.redis_memory import RedisMemory
 
 from interpretation_service.domain.models import RawInput, NormalizedInput, AgentRequest
 from interpretation_service.domain.exceptions import InvalidInputError
@@ -26,16 +29,29 @@ class RequestInterpreterService:
         stt_provider: ISTTProvider,
         llm_provider: ILLMProvider,
         bus_publisher: IMessageBus,
+        memory: Optional[RedisMemory] = None,
     ) -> None:
         self.stt = stt_provider
         self.llm = llm_provider
         self.bus = bus_publisher
         self.normalizer = InputNormalizer()
+        self.memory = memory
 
     async def process_request(self, raw_input: RawInput) -> AgentRequest:
         logger.info(
             "Processing request %s for user %s", raw_input.request_id, raw_input.user_id
         )
+
+        # 0. Si on a une mémoire et une conversation_id, on log le tour brut
+        if self.memory and raw_input.conversation_id:
+            self.memory.append_message(
+                raw_input.conversation_id,
+                {
+                    "role": "user",
+                    "text": raw_input.raw_text,
+                    "audio": bool(raw_input.raw_audio_url),
+                },
+            )
 
         text_content = raw_input.raw_text
 
@@ -54,9 +70,20 @@ class RequestInterpreterService:
         clean_text = self.normalizer.normalize(text_content)
         logger.debug("Normalized text: %s", clean_text)
 
+        # 2bis. Historique de conversation (optionnel)
+        history = []
+        if self.memory and raw_input.conversation_id:
+            history = self.memory.get_history(raw_input.conversation_id)
+
         normalized_input = NormalizedInput(
             text=clean_text,
-            user_context={"user_id": raw_input.user_id, **raw_input.metadata},
+            user_context={
+                "user_id": raw_input.user_id,
+                "conversation_id": raw_input.conversation_id,
+                "turn_index": raw_input.turn_index,
+                "history": history,
+                **raw_input.metadata,
+            },
         )
 
         agent_spec = await self.llm.analyze_and_structure(normalized_input)
@@ -70,6 +97,16 @@ class RequestInterpreterService:
 
         await self.bus.publish("agent_factory.requests.local", final_request)
         logger.info("Request %s processed and 'published' locally.", raw_input.request_id)
+
+        # 4. Si mémoire, loguer la réponse aussi
+        if self.memory and raw_input.conversation_id:
+            self.memory.append_message(
+                raw_input.conversation_id,
+                {
+                    "role": "system",
+                    "agent_spec": final_request.spec.model_dump(),
+                },
+            )
 
         return final_request
 

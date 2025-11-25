@@ -48,6 +48,5 @@ tu dois donc respecter strictement les champs et leurs types logiques.
 Ne produis AUCUN texte explicatif en dehors de ces champs.
 Ne produis AUCUN code.
 Ne commente pas tes choix.
-Réponds UNIQUEMENT avec un objet JSON valide respectant le schéma ci-dessous.
 
 {format_instructions}

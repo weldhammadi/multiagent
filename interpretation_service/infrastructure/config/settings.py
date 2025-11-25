@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     # Groq / LangChain
     groq_api_key: str
     groq_model: str = "llama-3.1-8b-instant"
+    groq_stt_model: str = "whisper-large-v3"
 
     # Plus tard : d'autres APIs, URLs, etc.
     # openai_api_key: str | None = None

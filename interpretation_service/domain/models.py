@@ -12,6 +12,8 @@ class RawInput(BaseModel):
     user_id: str
     raw_text: Optional[str] = None
     raw_audio_url: Optional[str] = None
+    conversation_id: Optional[str] = None
+    turn_index: Optional[int] = None
     timestamp: datetime = Field(default_factory=datetime.now)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
