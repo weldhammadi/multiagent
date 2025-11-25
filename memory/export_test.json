@@ -1,0 +1,59 @@
+{
+  "version": "1.0",
+  "created_at": "2025-11-25T15:01:44.957632",
+  "last_updated": "2025-11-25T15:05:00.235225",
+  "tools": {
+    "csv_cleaner": {
+      "name": "csv_cleaner",
+      "description": "Nettoie les fichiers CSV en supprimant les doublons",
+      "code": "def csv_cleaner(file_path): ...",
+      "parameters": [
+        "file_path: str"
+      ],
+      "return_type": "pd.DataFrame",
+      "external_api": null,
+      "created_at": "2025-11-25T15:05:00.234229",
+      "used_in_agents": [
+        "data_processor_agent"
+      ]
+    }
+  },
+  "models": {
+    "groq_llama-3.3-70b-versatile_text_analysis": {
+      "purpose": "text_analysis",
+      "provider": "groq",
+      "model_name": "llama-3.3-70b-versatile",
+      "temperature": 0.1,
+      "max_tokens": 1000,
+      "system_prompt": "Tu es un analyseur de texte.",
+      "created_at": "2025-11-25T15:05:00.234229",
+      "used_in_agents": [
+        "text_analyzer_agent"
+      ]
+    }
+  },
+  "agents": {
+    "data_processor_agent": {
+      "name": "data_processor_agent",
+      "description": "Agent qui traite des données CSV",
+      "agent_type": "data_processor",
+      "tools_used": [
+        "csv_cleaner"
+      ],
+      "models_used": [
+        "groq_llama-3.3-70b-versatile_text_analysis"
+      ],
+      "created_at": "2025-11-25T15:05:00.235225",
+      "github_url": "https://github.com/user/repo",
+      "render_url": "https://app.render.com/service",
+      "status": "deployed"
+    }
+  },
+  "statistics": {
+    "total_tools": 1,
+    "total_models": 1,
+    "total_agents": 1,
+    "successful_deployments": 2,
+    "failed_deployments": 0
+  }
+}

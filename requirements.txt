@@ -45,3 +45,4 @@ pydantic==2.9.2
 # Tests unitaires
 # ============================
 pytest==8.3.3
+python-dotenv
