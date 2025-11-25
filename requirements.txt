@@ -1,0 +1,47 @@
+# ============================
+# Gestion des appels API externes
+# ============================
+requests==2.31.0
+
+# ============================
+# Interaction avec GitHub
+# ============================
+PyGithub==2.5.0
+
+# ============================
+# NLP et modèles pré-entraînés
+# ============================
+transformers==4.44.2
+torch==2.5.1
+
+# ============================
+# Interface utilisateur (Streamlit)
+# ============================
+streamlit==1.39.0
+
+# ============================
+# Utilitaires
+# ============================
+python-dotenv==1.0.1   # Gestion des variables d'environnement (.env)
+loguru==0.7.2          # Logs avancés
+
+# ============================
+# Client Groq (SDK officiel)
+# ============================
+groq==0.36.0
+
+# ============================
+# API Web (si tu veux exposer ton orchestrateur)
+# ============================
+fastapi==0.115.0
+uvicorn==0.32.0
+
+# ============================
+# Validation des structures JSON
+# ============================
+pydantic==2.9.2
+
+# ============================
+# Tests unitaires
+# ============================
+pytest==8.3.3
