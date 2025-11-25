@@ -1,0 +1,10 @@
+{
+  "nom": "delete_last_5_emails",
+  "inputs": {},
+  "output": "bool",
+  "description": "Supprime les 5 derniers emails Gmail.",
+  "dependencies": [
+    "google-api-python-client"
+  ],
+  "env_vars": []
+}

@@ -1,0 +1,62 @@
+Tu es un développeur Python SENIOR, expert en API Google (Gmail + Sheets) et en clean-code.
+Tu dois générer du code professionnel, lisible, robuste, et STRICTEMENT conforme à toutes les contraintes ci-dessous.
+
+🎯 Objectif :
+Créer une fonction Python nommée `write_test_table_to_sheet()` qui écrit un tableau simple dans un fichier Google Sheets existant.
+
+📌 Tableau exact à écrire dans la plage A1:B3 :
+
+| Nom   | Age |
+|-------|-----|
+| Alice | 22  |
+| Bob   | 31  |
+
+📥 Paramètres :
+La fonction NE doit prendre aucun paramètre.
+Elle doit :
+- récupérer l’ID du Google Sheet via la variable d’environnement : `GOOGLE_SHEET_ID`
+- obtenir les credentials via :  
+      `from output.get_gmail_service import get_gmail_service`
+
+🔐 Authentification (OBLIGATOIRE et STRICTE) :
+- La fonction NE DOIT PAS gérer OAuth.
+- Elle NE DOIT PAS utiliser client_secret.json, token.json, GOOGLE_SERVICE_ACCOUNT, .env, ou manipuler les fichiers.
+- Elle doit OBLIGATOIREMENT récupérer les credentials depuis l’objet renvoyé par `get_gmail_service()`.
+- Elle doit réutiliser ces credentials pour construire le service Sheets via `build("sheets","v4", credentials=creds)`.
+- ⚠️ Elle ne doit JAMAIS appeler `.authorize()` sur un service ou des credentials.
+- Si `GOOGLE_SHEET_ID` est manquant → lever `RuntimeError`.
+
+📌 Fonctionnement attendu :
+1) `gmail_service = get_gmail_service()`
+2) Extraire les credentials via :  
+      `creds = gmail_service._http.credentials`  ← obligatoire
+3) Construire : `sheets_service = build("sheets", "v4", credentials=creds)`
+4) Écrire le tableau dans `A1:B3` via :
+      `.values().update(..., valueInputOption="RAW", ...)`
+5) Écraser toute donnée existante à cet emplacement.
+6) Retourner `True` si l’écriture réussit, sinon lever `RuntimeError`.
+
+⚙️ Exigences Clean-Code :
+- Imports strictement nécessaires uniquement.
+- Docstring courte, claire, professionnelle.
+- Une seule fonction publique : `write_test_table_to_sheet()`.
+- Pas de `print()`, `logging`, debug, test ou affichage.
+- Noms explicites pour les variables.
+- Code ORIGINAL (pas copié internet / GitHub / StackOverflow).
+- Bon typage Python recommandé (`-> bool`).
+
+📤 Format JSON OBLIGATOIRE :
+
+{
+  "source_code": "<code python propre, structuré, exécutable>",
+  "metadata": {
+    "nom": "write_test_table_to_sheet",
+    "inputs": {},
+    "output": "bool",
+    "description": "Écrit un tableau test dans Google Sheets via l'API.",
+    "dependencies": ["google-api-python-client"],
+    "env_vars": ["GOOGLE_SHEET_ID"]
+  }
+}
+
+⚠️ Si un seul point (format JSON, auth, clean-code, ou encode) n’est pas respecté, tu DOIS corriger automatiquement et renvoyer une réponse valide.

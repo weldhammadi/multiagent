@@ -1,0 +1,10 @@
+{
+  "nom": "get_last_3_subjects",
+  "inputs": {},
+  "output": "List[str]",
+  "description": "Retourne l’objet (Subject) des 3 derniers emails Gmail.",
+  "dependencies": [
+    "google-api-python-client"
+  ],
+  "env_vars": []
+}

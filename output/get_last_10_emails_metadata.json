@@ -1,0 +1,10 @@
+{
+  "nom": "get_last_10_emails",
+  "inputs": {},
+  "output": "List[Dict]",
+  "description": "Récupère les 10 derniers emails Gmail (id, expéditeur, objet).",
+  "dependencies": [
+    "google-api-python-client"
+  ],
+  "env_vars": []
+}

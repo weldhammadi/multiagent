@@ -1,0 +1,10 @@
+{
+  "nom": "mark_last_10_as_read",
+  "inputs": {},
+  "output": "bool",
+  "description": "Marque comme lus les 10 derniers emails Gmail.",
+  "dependencies": [
+    "google-api-python-client"
+  ],
+  "env_vars": []
+}

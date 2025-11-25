@@ -1,0 +1,10 @@
+{
+    "nom": "get_users",
+    "inputs": {},
+    "output": "List[Dict[str, Any]]",
+    "description": "R\u00e9cup\u00e8re les utilisateurs depuis https://jsonplaceholder.typicode.com/users via une requ\u00eate GET.",
+    "dependencies": [
+        "requests"
+    ],
+    "env_vars": []
+}

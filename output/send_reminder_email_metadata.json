@@ -1,0 +1,11 @@
+{
+  "nom": "send_reminder_email",
+  "inputs": {},
+  "output": "bool",
+  "description": "Envoie un email de rappel automatique via Gmail API.",
+  "schema_output": {},
+  "dependencies": [
+    "google-api-python-client"
+  ],
+  "env_vars": []
+}

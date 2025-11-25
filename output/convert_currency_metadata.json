@@ -1,0 +1,15 @@
+{
+  "nom": "convert_currency",
+  "description": "Conversion simple EUR/USD",
+  "inputs": {
+    "montant": "float",
+    "direction": "'EUR_TO_USD' ou 'USD_TO_EUR'",
+    "taux": "float"
+  },
+  "output": "float",
+  "schema_output": {
+    "converted_amount": "float"
+  },
+  "dependencies": [],
+  "env_vars": []
+}

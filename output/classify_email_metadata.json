@@ -1,0 +1,10 @@
+{
+  "nom": "classify_email",
+  "description": "Classifie un email en SPAM / IMPORTANT / NORMAL selon son contenu",
+  "inputs": {
+    "email_text": "string"
+  },
+  "output": "string",
+  "dependencies": [],
+  "env_vars": []
+}

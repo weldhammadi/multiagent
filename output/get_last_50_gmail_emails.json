@@ -1,0 +1,20 @@
+{
+    "nom": "get_last_50_gmail_emails",
+    "inputs": {},
+    "output": "List[Dict[str, str]]",
+    "description": "R\u00e9cup\u00e8re les 50 derniers e\u2011mails Gmail de l'utilisateur authentifi\u00e9.",
+    "schema_output": {
+        "id": "str",
+        "from": "str",
+        "subject": "str",
+        "snippet": "str"
+    },
+    "dependencies": [
+        "requests",
+        "os"
+    ],
+    "env_vars": [
+        "GMAIL_API_KEY",
+        "GMAIL_OAUTH_TOKEN"
+    ]
+}

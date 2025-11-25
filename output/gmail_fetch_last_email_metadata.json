@@ -1,0 +1,18 @@
+{
+  "nom": "gmail_fetch_last_email",
+  "description": "Récupération du dernier email via l'API Gmail",
+  "inputs": {
+    "token_path": "string",
+    "credentials_path": "string"
+  },
+  "output": "dict",
+  "schema_output": {
+    "subject": "string",
+    "body": "string"
+  },
+  "dependencies": [
+    "google-api-python-client",
+    "google-auth"
+  ],
+  "env_vars": []
+}
