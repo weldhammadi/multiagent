@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Multi-Agent Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #f4f4f4;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 30px auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        #messages {
+            height: 400px;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background: #fafafa;
+            border-radius: 8px;
+        }
+
+        .bubble-user {
+            background: #007bff;
+            color: white;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 8px;
+            text-align: right;
+        }
+
+        .bubble-assistant {
+            background: #e5e5e5;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+
+        .input-row {
+            display: flex;
+            margin-top: 10px;
+        }
+
+        #message {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #aaa;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin-left: 10px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="chat-container">
+
+        <h2>🧠 Assistant Multi-Agent</h2>
+        <div id="messages"></div>
+
+        <div class="input-row">
+            <input type="text" id="message" placeholder="Écris ton message…">
+            <button onclick="sendMessage()">Envoyer</button>
+        </div>
+
+    </div>
+
+    <script>
+        const sessionId = "session_" + Math.floor(Math.random() * 100000);
+
+        function addMessage(text, sender) {
+            const msgs = document.getElementById("messages");
+            const div = document.createElement("div");
+            div.className = sender === "user" ? "bubble-user" : "bubble-assistant";
+            div.textContent = text;
+            msgs.appendChild(div);
+            msgs.scrollTop = msgs.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById("message");
+            const text = input.value.trim();
+            if (!text) return;
+
+            addMessage(text, "user");
+            input.value = "";
+
+            const payload = {
+                session_id: sessionId,
+                user_id: "web_user",
+                message: text,
+                metadata: {}
+            };
+
+            // Utilisation d'une URL relative pour être indépendant du port
+            const response = await fetch("/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+            addMessage(data.reply, "assistant");
+
+            if (data.done) {
+                addMessage("🎉 Spécification générée !", "assistant");
+                addMessage(JSON.stringify(data.agent_spec, null, 2), "assistant");
+            }
+        }
+
+        // Allow Enter to send
+        document.getElementById('message').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+
+</body>
+
+</html>

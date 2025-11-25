@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "timestamp": "C:\\Users\\yanis\\OneDrive\\Bureau\\AI Agents",
+  "components": {
+    "tools": [],
+    "models": [],
+    "metadata": {
+      "agent_requirements": {
+        "role": "agent_de_test",
+        "description": "Agent généré pour test local (aucun appel LLM).",
+        "agent_type": "custom",
+        "objectives": [
+          "Tester la génération de fichiers"
+        ],
+        "tools_needed": [],
+        "models_needed": [],
+        "constraints": [],
+        "input_format": "dict",
+        "output_format": "dict"
+      },
+      "tools_to_generate": [],
+      "models_to_configure": [],
+      "dependencies": [
+        "groq",
+        "python-dotenv"
+      ],
+      "architecture_type": "tool_based_agent",
+      "estimated_complexity": "simple"
+    }
+  }
+}
