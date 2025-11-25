@@ -65,12 +65,89 @@ class ToolGenerator:
         
         return sanitized
     
+    def _create_env_file(self, tool_name: str, env_vars: list) -> Path:
+        """
+        Crée un fichier .env avec les variables nécessaires (clés vides).
+        
+        Args:
+            tool_name: Nom de l'outil
+            env_vars: Liste des variables d'environnement requises
+            
+        Returns:
+            Chemin du fichier .env créé (ou None si déjà existant)
+            
+        Raises:
+            RuntimeError: Si erreur d'écriture fichier
+        """
+        clean_name = self._sanitize_tool_name(tool_name)
+        env_file = self.output_dir / f"{clean_name}.env"
+        
+        # Ne jamais écraser un fichier existant
+        if env_file.exists():
+            print(f"⚠️  Fichier {env_file.name} existe déjà, il ne sera pas écrasé")
+            return env_file
+        
+        # Génération du contenu .env (clés vides uniquement)
+        env_content = "\n".join(f"{var}=" for var in env_vars)
+        env_content += "\n"  # Ligne vide finale
+        
+        try:
+            env_file.write_text(env_content, encoding="utf-8")
+            print(f"📝 Fichier {env_file.name} créé (à remplir manuellement)")
+            return env_file
+        except Exception as exc:
+            raise RuntimeError(
+                f"Erreur lors de la création du fichier .env {env_file}: {exc}"
+            ) from exc
+    
+    def _create_config_files(self, tool_name: str, config_files: list) -> Dict[str, Path]:
+        """
+        Crée des fichiers JSON de configuration vides.
+        
+        Args:
+            tool_name: Nom de l'outil
+            config_files: Liste des noms de fichiers JSON à créer
+            
+        Returns:
+            Dictionnaire {nom_fichier: Path} des fichiers créés
+            
+        Raises:
+            RuntimeError: Si erreur d'écriture fichier
+        """
+        clean_name = self._sanitize_tool_name(tool_name)
+        created_files = {}
+        
+        for config_name in config_files:
+            # Nettoyage du nom (enlever .json si présent)
+            if config_name.endswith(".json"):
+                config_name = config_name[:-5]
+            
+            config_file = self.output_dir / f"{clean_name}_{config_name}.json"
+            
+            # Ne jamais écraser un fichier existant
+            if config_file.exists():
+                print(f"⚠️  Fichier {config_file.name} existe déjà, il ne sera pas écrasé")
+                created_files[config_name] = config_file
+                continue
+            
+            # Création d'un JSON vide
+            try:
+                config_file.write_text("{}\n", encoding="utf-8")
+                print(f"📝 Fichier {config_file.name} créé (à remplir manuellement)")
+                created_files[config_name] = config_file
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Erreur lors de la création du fichier config {config_file}: {exc}"
+                ) from exc
+        
+        return created_files
+    
     def save_tool(
         self,
         tool_name: str,
         source_code: str,
         metadata: Dict[str, Any]
-    ) -> Dict[str, Path]:
+    ) -> Dict[str, Any]:
         """
         Sauvegarde l'outil et ses métadonnées.
         
@@ -83,6 +160,8 @@ class ToolGenerator:
             Dictionnaire avec chemins des fichiers créés:
                 - 'python': chemin du fichier .py
                 - 'metadata': chemin du fichier .json
+                - 'env' (optionnel): chemin du fichier .env
+                - 'config_files' (optionnel): dict des fichiers JSON créés
                 
         Raises:
             RuntimeError: Si erreur d'écriture fichier
@@ -90,7 +169,7 @@ class ToolGenerator:
         # Nettoyage nom
         clean_name = self._sanitize_tool_name(tool_name)
         
-        # Chemins fichiers
+        # Chemins fichiers principaux
         python_file = self.output_dir / f"{clean_name}.py"
         metadata_file = self.output_dir / f"{clean_name}_metadata.json"
         
@@ -113,7 +192,21 @@ class ToolGenerator:
                 f"Erreur lors de la sauvegarde des métadonnées {metadata_file}: {exc}"
             ) from exc
         
-        return {
+        result = {
             "python": python_file,
             "metadata": metadata_file
         }
+        
+        # === NOUVEAUTÉ : Création fichier .env si nécessaire ===
+        env_vars = metadata.get("env_vars", [])
+        if env_vars and isinstance(env_vars, list) and len(env_vars) > 0:
+            env_file = self._create_env_file(tool_name, env_vars)
+            result["env"] = env_file
+        
+        # === NOUVEAUTÉ : Création fichiers JSON config si nécessaire ===
+        config_files = metadata.get("config_files", [])
+        if config_files and isinstance(config_files, list) and len(config_files) > 0:
+            created_configs = self._create_config_files(tool_name, config_files)
+            result["config_files"] = created_configs
+        
+        return result

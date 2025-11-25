@@ -2,7 +2,7 @@
 Agent d'Outils v2 - Recherche GitHub + Génération LLM
 
 Workflow:
-1. Recherche sur GitHub si un outil similaire existe
+1. Recherche sur GitHub si un outil similaire existe (DÉSACTIVÉ TEMPORAIREMENT)
 2. Si trouvé → Clone + CSV + Arrêt (pas de LLM)
 3. Si aucun résultat pertinent → Génération via Groq LLM
 """
@@ -22,6 +22,12 @@ from llm_client import GroqClient
 from agents.generator import ToolGenerator
 from agents.validator import validate_tool_response
 from agents.github_searcher import GitHubSearcher
+
+
+# ======================================================
+#  CONFIGURATION
+# ======================================================
+ENABLE_GITHUB_SEARCH = False  # ⚙️ Mettre à True pour réactiver GitHub
 
 
 # ======================================================
@@ -83,7 +89,7 @@ def extract_search_keywords(user_prompt: str) -> str:
         else:
             return "python utility tool"
 
-    BAD_KEYWORDS = ["aucun", "pas trouvé", "non disponible", "n’a été", "n'a été"]
+    BAD_KEYWORDS = ["aucun", "pas trouvé", "non disponible", "n'a été", "n'a été"]
     if any(x in keywords.lower() for x in BAD_KEYWORDS):
         return "python utility tool"
 
@@ -91,7 +97,7 @@ def extract_search_keywords(user_prompt: str) -> str:
 
 
 # ======================================================
-#  PHASE 1 : GITHUB
+#  PHASE 1 : GITHUB (CONSERVÉ MAIS DÉSACTIVÉ)
 # ======================================================
 def search_github(searcher: GitHubSearcher, keywords: str, output_dir: Path) -> List[Dict[str, Any]]:
     print(f"\n🔍 Recherche sur GitHub avec: '{keywords}'")
@@ -127,7 +133,7 @@ def search_github(searcher: GitHubSearcher, keywords: str, output_dir: Path) -> 
 
 def clone_best_repository(searcher: GitHubSearcher, repos: List[Dict[str, Any]], output_dir: Path) -> bool:
     best = max(repos, key=lambda r: r["stars"])
-    print(f"\n📥 Clone du repo le plus pertinent: {best['full_name']} ({best['stars']} ⭐)")
+    print(f"\n🔥 Clone du repo le plus pertinent: {best['full_name']} ({best['stars']} ⭐)")
 
     dest = output_dir / "cloned_repos" / best["name"]
     success = searcher.clone_repository(best["clone_url"], dest)
@@ -161,32 +167,50 @@ def generate_with_llm(user_prompt: str, output_dir: Path) -> None:
     name = tool_data["metadata"].get("nom", "tool")
 
     files = generator.save_tool(name, tool_data["source_code"], tool_data["metadata"])
-    print("🎉 Outil généré par LLM !")
+    
+    print("\n🎉 Outil généré par LLM !")
     print(f"📌 {files['python']}")
     print(f"📌 {files['metadata']}")
+    
+    # Affichage fichiers supplémentaires
+    if "env" in files:
+        print(f"🔐 {files['env']} (⚠️  À remplir manuellement)")
+    
+    if "config_files" in files:
+        for config_name, config_path in files["config_files"].items():
+            print(f"⚙️  {config_path} (⚠️  À remplir manuellement)")
 
 
 # ======================================================
 #  MAIN
 # ======================================================
 def main() -> None:
-    print("🚀 Agent d'Outils v2 - Recherche GitHub + Génération LLM")
+    print("🚀 Agent d'Outils v2 - Génération LLM")
+    if ENABLE_GITHUB_SEARCH:
+        print("🔍 Recherche GitHub : ACTIVÉE")
+    else:
+        print("⏸️  Recherche GitHub : DÉSACTIVÉE (génération directe)")
     print("=" * 60)
 
     output_dir = Path("output")
     output_dir.mkdir(exist_ok=True)
 
     user_prompt = load_file_content(Path("prompts/example_prompt.txt"))
-    keywords = extract_search_keywords(user_prompt)
+    
+    # Phase 1: GitHub (DÉSACTIVÉ TEMPORAIREMENT)
+    if ENABLE_GITHUB_SEARCH:
+        keywords = extract_search_keywords(user_prompt)
+        results = search_github(GitHubSearcher(), keywords, output_dir)
+        if results and clone_best_repository(GitHubSearcher(), results, output_dir):
+            print("\n🎉 Outil trouvé sur GitHub. Fin.")
+            return
 
-    # Phase 1: GitHub
-    results = search_github(GitHubSearcher(), keywords, output_dir)
-    if results and clone_best_repository(GitHubSearcher(), results, output_dir):
-        print("\n🎉 Outil trouvé sur GitHub. Fin.")
-        return
-
-    # Phase 2: LLM
-    print("\n⚙️ Aucun outil trouvé. Génération via LLM...")
+    # Phase 2: LLM (toujours actif)
+    if ENABLE_GITHUB_SEARCH:
+        print("\n⚙️ Aucun outil trouvé. Génération via LLM...")
+    else:
+        print("\n⚙️ Génération directe via LLM...")
+    
     generate_with_llm(user_prompt, output_dir)
 
 

@@ -3,9 +3,6 @@
   "inputs": {},
   "output": "bool",
   "description": "Écrit un tableau test dans Google Sheets via l'API.",
-  "schema_output": {
-    "result": "bool"
-  },
   "dependencies": [
     "google-api-python-client"
   ],
