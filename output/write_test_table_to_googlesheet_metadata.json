@@ -1,0 +1,19 @@
+{
+  "nom": "write_test_table_to_googlesheet",
+  "description": "Écrit un tableau test dans Google Sheets via l’API Gmail + Sheets.",
+  "inputs": {},
+  "output": "bool",
+  "schema_output": {},
+  "dependencies": [
+    "google-api-python-client"
+  ],
+  "env_vars": [
+    "GOOGLE_SHEET_ID"
+  ],
+  "config_files": [],
+  "auth_files": [],
+  "called_functions": [
+    "get_gmail_service"
+  ],
+  "pdf_files": []
+}

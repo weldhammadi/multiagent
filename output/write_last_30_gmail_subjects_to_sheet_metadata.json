@@ -1,0 +1,19 @@
+{
+  "nom": "write_last_30_gmail_subjects_to_sheet",
+  "description": "Récupère les 30 derniers objets Gmail et les écrit dans Google Sheets.",
+  "inputs": {},
+  "output": "bool",
+  "schema_output": {},
+  "dependencies": [
+    "google-api-python-client"
+  ],
+  "env_vars": [
+    "GOOGLE_SHEET_ID"
+  ],
+  "config_files": [],
+  "auth_files": [],
+  "called_functions": [
+    "get_gmail_service"
+  ],
+  "pdf_files": []
+}
