@@ -1,63 +1,167 @@
 import os
 import json
 import ast
-from typing import Dict, Any, Optional
+import uuid
+from datetime import datetime
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass, field
 from dotenv import load_dotenv
 from groq import Groq
 
-# On charge les variables d'environnement (.env)
+# Chargement des variables d'environnement (.env)
 load_dotenv()
+
+# -------------------------------------------------------------------
+# Définition des classes AgentSpec
+# -------------------------------------------------------------------
+
+@dataclass
+class InputSpec:
+    name: str
+    type: str
+    description: str
+
+@dataclass
+class OutputSpec:
+    name: str
+    type: str
+    description: str
+
+@dataclass
+class AgentSpec:
+    request_id: str
+    user_id: str
+    agent_purpose: str
+    high_level_goal: str
+    agent_type: str                    # "TOOL_CREATOR" | "MODEL_USER" | "DEBUGGER"
+    routing_decision: str              # "TOOL" | "MODEL" | "DEBUG"
+    confidence: str                    # "faible" | "moyenne" | "élevée"
+    inputs: List[InputSpec] = field(default_factory=list)
+    outputs: List[OutputSpec] = field(default_factory=list)
+    constraints: List[str] = field(default_factory=list)
+    success_criteria: List[str] = field(default_factory=list)
+    needs_clarification: bool = False
+    clarification_question: Optional[str] = None
+    status: str = "created"
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+
+    @staticmethod
+    def from_json(data: Dict[str, Any]) -> "AgentSpec":
+        spec = data.get("spec", {})
+        return AgentSpec(
+            request_id=data.get("request_id", str(uuid.uuid4())),
+            user_id=data.get("user_id", "anonymous"),
+            agent_purpose=spec.get("agent_purpose", ""),
+            high_level_goal=spec.get("high_level_goal", ""),
+            agent_type=spec.get("agent_type", ""),
+            routing_decision=spec.get("routing_decision", ""),
+            confidence=spec.get("confidence", "moyenne"),
+            inputs=[InputSpec(**inp) for inp in spec.get("inputs", [])],
+            outputs=[OutputSpec(**out) for out in spec.get("outputs", [])],
+            constraints=spec.get("constraints", []),
+            success_criteria=spec.get("success_criteria", []),
+            needs_clarification=spec.get("needs_clarification", False),
+            clarification_question=spec.get("clarification_question"),
+            status=data.get("status", data.get("status", "created")),
+            created_at=data.get("created_at", datetime.utcnow().isoformat())
+        )
+
+    def to_json(self) -> Dict[str, Any]:
+        return {
+            "request_id": self.request_id,
+            "user_id": self.user_id,
+            "spec": {
+                "agent_purpose": self.agent_purpose,
+                "high_level_goal": self.high_level_goal,
+                "agent_type": self.agent_type,
+                "routing_decision": self.routing_decision,
+                "confidence": self.confidence,
+                "inputs": [inp.__dict__ for inp in self.inputs],
+                "outputs": [out.__dict__ for out in self.outputs],
+                "constraints": self.constraints,
+                "success_criteria": self.success_criteria,
+                "needs_clarification": self.needs_clarification,
+                "clarification_question": self.clarification_question
+            },
+            "status": self.status,
+            "created_at": self.created_at
+        }
+
+# -------------------------------------------------------------------
+# Orchestrateur
+# -------------------------------------------------------------------
 
 class Orchestrator:
     """
     Le Cerveau du système.
     Responsabilités :
-    1. Analyser la demande utilisateur (Routing).
-    2. Choisir l'agent approprié (Tool ou Model).
-    3. Valider le code généré via une exécution sécurisée.
-    4. Faire appel au Debug Agent en cas d'erreur.
+    1. Analyser la demande utilisateur et générer un AgentSpec JSON enrichi.
+    2. Choisir l'agent approprié (TOOL, MODEL ou DEBUG).
+    3. Générer et valider le code via une exécution contrôlée.
+    4. Faire appel à l'agent de debug en cas d'erreur.
     """
 
     def __init__(self):
         self.api_key = os.getenv("GROQ_API_KEY")
         if not self.api_key:
             raise ValueError("GROQ_API_KEY manquante dans le fichier .env")
-        
         self.client = Groq(api_key=self.api_key)
-        
-        # Configuration du modèle (Llama3-70b est excellent pour le code)
-        self.model_name = "openai/gpt-oss-120b" 
+        # Ajustez le nom du modèle à votre configuration Groq
+        self.model_name = "openai/gpt-oss-120b"
 
-    def analyze_request(self, user_request: str) -> str:
+    def analyze_request(self, user_request: str, user_id: str = "anonymous") -> AgentSpec:
         """
-        DÉCISION (ROUTING) : Détermine si c'est une tâche pour l'agent OUTILS ou MODÈLES.
+        Analyse la demande et génère un AgentSpec JSON enrichi utilisable par le workflow.
         """
         system_prompt = (
-            "Tu es un routeur intelligent. Analyse la demande. "
-            "Si la demande implique de créer une fonction utilitaire classique (maths, fichiers, traitement de texte), réponds 'TOOL'. "
-            "Si la demande implique d'utiliser une IA, un prompt, ou du contexte sémantique, réponds 'MODEL'. "
-            "Réponds UNIQUEMENT par le mot clé."
+            "Tu es le cerveau et l’orchestrateur d’un système multi-agents.\n"
+            "Analyse la demande utilisateur et retourne un objet JSON strict décrivant l'AgentSpec.\n\n"
+            "Format attendu :\n"
+            "{\n"
+            '  "request_id": "<uuid>",\n'
+            f'  "user_id": "{user_id}",\n'
+            '  "spec": {\n'
+            '    "agent_purpose": "But précis de l’agent",\n'
+            '    "high_level_goal": "Objectif global",\n'
+            '    "agent_type": "TOOL_CREATOR | MODEL_USER | DEBUGGER",\n'
+            '    "routing_decision": "TOOL | MODEL | DEBUG",\n'
+            '    "confidence": "faible | moyenne | élevée",\n'
+            '    "inputs": [ { "name": "...", "type": "...", "description": "..." } ],\n'
+            '    "outputs": [ { "name": "...", "type": "...", "description": "..." } ],\n'
+            '    "constraints": ["..."],\n'
+            '    "success_criteria": ["..."],\n'
+            '    "needs_clarification": false,\n'
+            '    "clarification_question": null\n'
+            '  },\n'
+            '  "status": "created",\n'
+            '  "created_at": "<timestamp ISO8601>"\n'
+            "}\n\n"
+            "Contraintes :\n"
+            "- Réponds uniquement en JSON valide.\n"
+            "- Pas de texte hors JSON."
         )
-        
+
         response = self.client.chat.completions.create(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_request}
             ],
             model=self.model_name,
-            temperature=0
+            temperature=0,
+            response_format={"type": "json_object"}
         )
-        return response.choices[0].message.content.strip().upper()
+
+        agent_spec_json = json.loads(response.choices[0].message.content)
+        return AgentSpec.from_json(agent_spec_json)
 
     def _simulate_agent_call(self, agent_type: str, request: str) -> Dict[str, Any]:
         """
-        PLACEHOLDER : Ici, vous importerez vos vrais agents (agents/tool_agent.py, etc.)
-        Pour l'instant, on simule leur réponse pour tester l'orchestrateur.
+        Remplacez cette simulation par l'appel à vos vrais agents:
+        - TOOL_CREATOR -> agents/tool_agent.py
+        - MODEL_USER   -> agents/model_agent.py
+        - DEBUGGER     -> agents/debug_agent.py
         """
-        print(f"🔄 Appel à l'agent {agent_type} pour : {request}")
-        
-        # Simulation d'une réponse d'agent (Format JSON strict requis)
-        # TODO: Remplacer ceci par : return tool_agent.generate(request)
+        print(f"Appel à l'agent {agent_type} pour la requête: {request}")
         return {
             "source_code": "def ma_fonction():\n    print('Hello World')\n    return True",
             "fonction": {"nom": "ma_fonction", "input": "None", "output": "Bool"}
@@ -65,97 +169,95 @@ class Orchestrator:
 
     def _test_code_validity(self, source_code: str) -> Optional[str]:
         """
-        GATEKEEPER : Vérifie si le code est syntaxiquement correct.
-        Retourne None si tout va bien, ou le message d'erreur (str) si ça plante.
+        Vérifie la validité syntaxique et exécute le code dans un contexte isolé.
+        Attention: exec() ne doit pas exécuter de code non fiable en production.
         """
         try:
-            # 1. Analyse syntaxique (ast) - Vérifie la structure sans exécuter
             ast.parse(source_code)
-            
-            # 2. Exécution contrôlée (optionnelle mais recommandée pour le runtime)
-            # Attention : exec() est dangereux en prod, mais OK pour un projet local contrôlé.
             context = {}
             exec(source_code, context)
-            
-            return None # Pas d'erreur
+            return None
         except Exception as e:
             return str(e)
 
     def _debug_loop(self, failed_code: str, error_msg: str) -> Dict[str, Any]:
         """
-        AGENT DE DEBUG (Orange) : Tente de réparer le code.
+        Appel à l'agent de debug pour corriger le code et retourner un JSON:
+        {"source_code": "<code corrigé>"}
         """
-        print(f"🛠️ DÉTECTION D'ERREUR : {error_msg}. L'agent de Debug prend le relais...")
-        
+        print(f"Erreur détectée: {error_msg}. Passage à l'agent de debug.")
         prompt = f"""
         Le code suivant contient une erreur :
         CODE:
         {failed_code}
-        
+
         ERREUR:
         {error_msg}
-        
-        Corrige le code. Renvoie UNIQUEMENT le code Python corrigé dans un bloc json formaté ainsi :
+
+        Corrige le code. Renvoie uniquement le code Python corrigé dans un bloc JSON formaté ainsi :
         {{"source_code": "..."}}
         """
-        
+
         response = self.client.chat.completions.create(
             messages=[
                 {"role": "system", "content": "Tu es un expert en débogage Python. Tu réponds en JSON pur."},
                 {"role": "user", "content": prompt}
             ],
             model=self.model_name,
-            response_format={"type": "json_object"} # Force le JSON (Feature Groq)
+            response_format={"type": "json_object"}
         )
-        
         return json.loads(response.choices[0].message.content)
 
-    def run_workflow(self, user_request: str):
-        print(f"🚀 Démarrage du workflow pour : '{user_request}'")
-        
-        # 1. ROUTING
-        agent_type = self.analyze_request(user_request)
-        print(f"👉 Route choisie : {agent_type}")
-        
-        # 2. GÉNÉRATION
-        # Note: Dans la version finale, importez vos classes Agent ici
-        agent_output = self._simulate_agent_call(agent_type, user_request)
+    def run_workflow(self, user_request: str, user_id: str = "anonymous") -> Dict[str, Any]:
+        """
+        Exécute le workflow complet:
+        1) Analyse et génération d'AgentSpec,
+        2) Appel de l'agent choisi,
+        3) Validation et correction en boucle,
+        4) Retour du résultat final et de l'AgentSpec.
+        """
+        print(f"Démarrage du workflow pour: '{user_request}'")
+
+        # 1. Analyse et AgentSpec
+        agent_spec = self.analyze_request(user_request, user_id)
+        print(f"Décision: {agent_spec.routing_decision} | Agent: {agent_spec.agent_type} | Confiance: {agent_spec.confidence}")
+
+        # 2. Génération par l'agent
+        agent_output = self._simulate_agent_call(agent_spec.agent_type, user_request)
         current_code = agent_output.get("source_code", "")
-        
-        # 3. BOUCLE DE VALIDATION (Max 3 essais)
+
+        # 3. Validation et corrections (max 3 essais)
         max_retries = 3
         is_valid = False
-        
         for attempt in range(max_retries):
             error = self._test_code_validity(current_code)
-            
             if error is None:
-                print("✅ Code validé avec succès !")
+                print("Code validé.")
                 is_valid = True
                 break
-            else:
-                print(f"❌ Échec essai {attempt + 1}/{max_retries}")
-                # Appel au Debug Agent
-                correction = self._debug_loop(current_code, error)
-                current_code = correction.get("source_code", current_code)
+            print(f"Echec essai {attempt + 1}/{max_retries}: {error}")
+            correction = self._debug_loop(current_code, error)
+            current_code = correction.get("source_code", current_code)
 
-        # 4. RESULTAT FINAL
+        # 4. Résultat final
+        result: Dict[str, Any]
         if is_valid:
-            # Ici, on renverrait vers github_push.py
-            return {
+            result = {
                 "status": "success",
                 "final_code": current_code,
-                "type": agent_type
+                "agent_spec": agent_spec.to_json()
             }
         else:
-            return {
+            result = {
                 "status": "failure",
-                "error": "Impossible de générer un code fonctionnel après 3 essais."
+                "error": "Impossible de générer un code fonctionnel après 3 essais.",
+                "agent_spec": agent_spec.to_json()
             }
+        return result
 
-# Pour tester directement le fichier (python core/orchestrator.py)
+# Exécution directe pour test
 if __name__ == "__main__":
     orchestrator = Orchestrator()
-    result = orchestrator.run_workflow("Crée une fonction qui calcule la suite de Fibonacci")
+    output = orchestrator.run_workflow("Crée une fonction qui calcule la suite de Fibonacci", user_id="yacine")
     print("\n--- RÉSULTAT FINAL ---")
-    print(json.dumps(result, indent=2))
+    print(json.dumps(output, indent=2, ensure_ascii=False))
