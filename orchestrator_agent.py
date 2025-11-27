@@ -14,9 +14,9 @@ from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 
 # Import your existing agents
-from tool_agent import ToolAgent
-from advanced_generator import AgentModeles as LLMAgent
-from AgentTestExecuteur import AgentTestExecuteur
+from tool_generator_agent import ToolAgent
+from model_generator_agent import AgentModeles as LLMAgent
+from execute_test_agent import AgentTestExecuteur
 
 
 class Orchestrator:
