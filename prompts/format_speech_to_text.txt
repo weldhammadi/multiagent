@@ -1,0 +1,76 @@
+FORMAT EXACT POUR SPEECH-TO-TEXT - SUIT CETTE STRUCTURE:
+```python
+from groq import Groq
+import os
+from pathlib import Path
+
+def transcribe_audio(audio_file_path, language=None, return_timestamps=False):
+    """
+    Transcrit un fichier audio en texte en utilisant Whisper Large V3.
+    
+    Args:
+        audio_file_path: Chemin vers le fichier audio (str ou Path)
+        language: Code langue ISO (ex: 'fr', 'en') - auto-détection si None
+        return_timestamps: Si True, inclut les timestamps dans la sortie
+    
+    Returns:
+        dict avec clés:
+            - text: Texte transcrit
+            - language: Langue détectée
+            - duration: Durée audio en secondes (si disponible)
+            - segments: Liste de segments avec timestamps (si demandé)
+    """
+    # Step 1: Validate input
+    audio_path = Path(audio_file_path)
+    if not audio_path.exists():
+        raise FileNotFoundError(f"Audio file not found: {audio_file_path}")
+    
+    allowed_formats = {'.mp3', '.wav', '.m4a', '.flac', '.ogg'}
+    if audio_path.suffix.lower() not in allowed_formats:
+        raise ValueError(f"Unsupported format. Use: {allowed_formats}")
+    
+    # Step 2: Get API key
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("GROQ_API_KEY not set")
+    
+    # Step 3: Create Groq client
+    client = Groq(api_key=api_key)
+    
+    # Step 4: Read audio file
+    with open(audio_path, 'rb') as audio_file:
+        # Step 5: Call Whisper model
+        transcription = client.audio.transcriptions.create(
+            model="whisper-large-v3",
+            file=audio_file,
+            language=language,
+            response_format="verbose_json" if return_timestamps else "json",
+            temperature=0.0
+        )
+    
+    # Step 6: Extract results
+    result = {
+        "text": transcription.text,
+        "language": getattr(transcription, 'language', 'unknown'),
+        "duration": getattr(transcription, 'duration', None)
+    }
+    
+    if return_timestamps and hasattr(transcription, 'segments'):
+        result["segments"] = [
+            {
+                "start": seg.start,
+                "end": seg.end,
+                "text": seg.text
+            }
+            for seg in transcription.segments
+        ]
+    
+    return result
+```
+
+RÈGLES CRITIQUES SPEECH-TO-TEXT:
+- Toujours lire le fichier audio en mode 'rb'
+- Utiliser client.audio.transcriptions.create()
+- Model DOIT être "whisper-large-v3"
+- Supporter response_format: "json" ou "verbose_json"
+- Retourner un dict avec les clés exactes spécifiées
