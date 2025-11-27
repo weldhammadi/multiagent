@@ -3,17 +3,28 @@ from dotenv import load_dotenv
 
 # Charger les variables de .env
 load_dotenv()
+from agents.agents_testeur import AgentTestExecuteur
+import json
 
-from output.write_last_30_gmail_subjects_to_sheet import   write_last_30_gmail_subjects_to_sheet
-def main():
-    try:
-        result =  write_last_30_gmail_subjects_to_sheet()
-        if result:
-            print("✔️ Les 10 derniers emails non lus ont été marqués comme lus.")
-        else:
-            print("❌ La fonction a retourné False.")
-    except Exception as e:
-        print("❌ Erreur :", e)
+# 📌 Nom du fichier à tester
+file_to_test = "test_hello.py"
 
-if __name__ == "__main__":
-    main()
+# 📌 Lire le code du fichier
+with open(file_to_test, "r", encoding="utf-8") as f:
+    code_content = f.read()
+
+# 📌 Créer l'agent testeur
+agent = AgentTestExecuteur()
+
+# 📌 Tester le code lu
+result = agent.tester_agent(
+    code_agent=code_content,
+    description=f"Test automatique du fichier {file_to_test}",
+    test_cases=None  # Tu peux laisser None si tu ne veux pas de test_cases
+)
+
+# 📌 Afficher le résultat à l’écran
+print(json.dumps(result, indent=2, ensure_ascii=False))
+
+# 📌 Sauvegarder le résultat dans un JSON
+agent.sauvegarder_resultat(result, f"result_test_{file_to_test}.json")

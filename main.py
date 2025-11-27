@@ -139,7 +139,7 @@ def clone_best_repository(searcher: GitHubSearcher, repos: List[Dict[str, Any]],
     success = searcher.clone_repository(best["clone_url"], dest)
 
     if success:
-        print(f"🎉 Repo cloné dans: {dest}")
+        print(f"🎉 Repo cloné dans: {dest}") 
         return True
 
     print("⚠️ Clone échoué (git absent ou timeout)")

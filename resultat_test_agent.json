@@ -1,0 +1,18 @@
+{
+  "statut": "OK",
+  "timestamp": "2025-11-27T10:51:33.475683",
+  "code_teste": "\ndef calculer_statistiques(nombres):\n    \"\"\"Calcule des statistiques sur une liste de nombres.\"\"\"\n    if not nombres:\n        return {\"erreur\": \"Liste vide\"}\n    \n    total = sum(nombres)\n    moyenne = total / len(nombres)\n    maximum = max(nombres)\n    minimum = min(nombres)\n    \n    return {\n        \"moyenne\": moyenne,\n        \"total\": total,\n        \"max\": maximum,\n        \"min\": minimum,\n        \"count\": len(nombres)\n    }\n\n# Tests automatiques\nprint(\"Test 1:\", calculer_statistiques([1, 2, 3, 4, 5]))\nprint(\"Test 2:\", calculer_statistiques([10, 20, 30]))\nprint(\"Test 3:\", calculer_statistiques([]))  # Doit gérer liste vide\nprint(\"Test 4:\", calculer_statistiques([-5, 0, 5]))  # Nombres négatifs\n",
+  "description": "Agent qui calcule des statistiques sur des nombres",
+  "resultats_tests": [],
+  "erreurs": null,
+  "message": "Tous les tests sont passés",
+  "execution_details": {
+    "model": "groq/compound",
+    "nombre_tests": 3,
+    "tokens": {
+      "prompt": 10718,
+      "completion": 2420,
+      "total": 13138
+    }
+  }
+}
