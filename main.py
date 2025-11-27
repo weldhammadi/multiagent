@@ -27,9 +27,11 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).parent))
 
 
+
 from orchestrator_agent import Orchestrator
 from speech_to_text_agent import SpeechToTextAgent
 from github_push import push_project
+from memory_system import MemoryManager
 
 # Load environment variables
 load_dotenv()
@@ -424,59 +426,75 @@ def render_header():
 
 
 def render_sidebar():
-    """Render the sidebar with settings and info."""
+    """Render the sidebar with settings, info, and memory display/search."""
     with st.sidebar:
         st.markdown("## ⚙️ Settings")
-        
         # Agent name input
         agent_name = st.text_input(
             "Agent Name",
             value="my_agent",
             help="Name for the generated agent files"
         )
-        
         st.markdown("---")
-        
         # API Key status
         st.markdown("## 🔑 API Status")
-        
         groq_key = os.getenv("GROQ_API_KEY")
         if groq_key:
             st.success("✅ GROQ_API_KEY configured")
         else:
             st.error("❌ GROQ_API_KEY not set")
             st.info("Add GROQ_API_KEY to your .env file")
-        
         st.markdown("---")
-        
         # Quick examples
         st.markdown("## 💡 Examples")
-        
         examples = [
             ("📧 Email Classifier", "An agent that reads emails and classifies them into categories like work, personal, spam, and important."),
             ("📖 Story Generator", "An agent that creates children's stories and converts them to audio using text-to-speech."),
             ("🌤️ Weather Bot", "An agent that fetches weather data and provides natural language summaries."),
             ("📊 Data Analyzer", "An agent that analyzes CSV files and generates insights using AI."),
         ]
-        
         for title, desc in examples:
             if st.button(title, key=f"example_{title}"):
                 st.session_state.transcribed_text = desc
                 st.rerun()
-        
         st.markdown("---")
-        
         # Stats
         if st.session_state.generated_result:
             st.markdown("## 📊 Last Generation")
             result = st.session_state.generated_result
-            
             col1, col2 = st.columns(2)
             with col1:
                 st.metric("Tools", len(result.get("tools", [])))
             with col2:
                 st.metric("LLM Functions", len(result.get("llm_functions", [])))
-        
+        st.markdown("---")
+        # --- MEMORY SYSTEM: Display/search memory ---
+        st.markdown("## 🧠 Memory")
+        memory = MemoryManager()
+        stats = memory.get_statistics()
+        st.caption(f"Tools: {stats['total_tools']} | Models: {stats['total_models']} | Agents: {stats['total_agents']}")
+        # Search bar
+        mem_search = st.text_input("Search memory", value="", key="memory_search")
+        if mem_search:
+            st.markdown("### 🔍 Search Results")
+            tools = memory.search_tools(mem_search)
+            agents = memory.search_agents(mem_search)
+            if not tools and not agents:
+                st.info("No results found.")
+            if tools:
+                st.markdown("**Tools:**")
+                for t in tools:
+                    st.markdown(f"- `{t.name}`: {t.description[:60]}...")
+            if agents:
+                st.markdown("**Agents:**")
+                for a in agents:
+                    st.markdown(f"- `{a.name}`: {a.description[:60]}...")
+        else:
+            # Show summary report (truncated for sidebar)
+            with st.expander("📄 Memory Summary", expanded=False):
+                report = memory.generate_report()
+                st.text(report[:2000] + ("..." if len(report) > 2000 else ""))
+        st.markdown("---")
         return agent_name
 
 

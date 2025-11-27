@@ -14,9 +14,13 @@ from typing import Dict, Any, List, Optional, Callable
 from dotenv import load_dotenv
 
 # Import your existing agents
+
 from tool_generator_agent import ToolAgent
 from model_generator_agent import AgentModeles as LLMAgent
 from execute_test_agent import AgentTestExecuteur
+# Memory system imports
+from memory_system import MemoryManager, ToolRecord, ModelRecord, AgentRecord
+from datetime import datetime
 
 
 class Orchestrator:
@@ -78,7 +82,10 @@ class Orchestrator:
         self.final_code_parts: List[str] = []
         self.generated_tools: List[Dict[str, Any]] = []
         self.generated_llm_functions: List[Dict[str, Any]] = []
-        
+
+        # Memory system
+        self.memory = MemoryManager(Path("memory/memory.json"))
+
         # Progress callback for UI updates
         self._progress_callback: Optional[Callable[[str, str], None]] = None
     
@@ -197,6 +204,20 @@ class Orchestrator:
                 generated_tools.append(result)
                 self.final_code_parts.append(result["source_code"])
                 self._emit_progress(f"   ✅ Tool generated: {result['metadata'].get('nom', tool_name)}", "success")
+
+                # --- MEMORY: Add tool to memory ---
+                meta = result.get("metadata", {})
+                tool_record = ToolRecord(
+                    name=meta.get("nom", tool_name),
+                    description=meta.get("description", tool.get("description", "")),
+                    code=result.get("source_code", ""),
+                    parameters=[f"{k}: {v}" for k, v in tool.get("inputs", {}).items()],
+                    return_type=str(tool.get("outputs", {})),
+                    external_api=meta.get("external_api"),
+                    created_at=datetime.now().isoformat(),
+                    used_in_agents=[]
+                )
+                self.memory.add_tool(tool_record)
             except Exception as exc:
                 self._emit_progress(f"   ❌ Error generating tool {tool_name}: {exc}", "error")
                 continue
@@ -236,6 +257,21 @@ class Orchestrator:
                 generated_llm.append(result)
                 self.final_code_parts.append(result["source_code"])
                 self._emit_progress(f"   ✅ LLM function generated: {result['metadata']['fonction']['nom']}", "success")
+
+                # --- MEMORY: Add model to memory ---
+                meta = result.get("metadata", {})
+                func_meta = meta.get("fonction", {})
+                model_record = ModelRecord(
+                    purpose=func.get("description", "purpose"),
+                    provider=meta.get("provider", "unknown"),
+                    model_name=meta.get("model_name", "unknown"),
+                    temperature=func.get("temperature", 0.3),
+                    max_tokens=func.get("max_tokens", 2048),
+                    system_prompt=func_meta.get("system_prompt", ""),
+                    created_at=datetime.now().isoformat(),
+                    used_in_agents=[]
+                )
+                self.memory.add_model(model_record)
             except Exception as exc:
                 self._emit_progress(f"   ❌ Error generating LLM function {func_name}: {exc}", "error")
                 continue
@@ -675,6 +711,20 @@ if __name__ == '__main__':
             self._emit_progress(f"   🔑 {config_result['credentials_file'].name} (⚠️ needs configuration)", "file")
         for name, path in config_result.get("config_files", {}).items():
             self._emit_progress(f"   ⚙️ {path.name} (⚠️ needs configuration)", "file")
+
+        # --- MEMORY: Add agent to memory ---
+        agent_record = AgentRecord(
+            name=agent_name,
+            description=user_request,
+            agent_type="auto-generated",
+            tools_used=[t.get("metadata", {}).get("nom", t.get("name", "unknown")) for t in self.generated_tools],
+            models_used=[m.get("metadata", {}).get("model_name", "unknown") for m in self.generated_llm_functions],
+            created_at=datetime.now().isoformat(),
+            github_url=None,
+            render_url=None,
+            status="deployed"
+        )
+        self.memory.add_agent(agent_record)
 
         return {
             "plan": plan,
