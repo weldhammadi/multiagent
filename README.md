@@ -31,6 +31,7 @@ The system is modular: each agent can be used independently or orchestrated toge
 
 ---
 
+
 ## Agents & Modules
 
 ### 1. ToolAgent (`tool_generator_agent.py`)
@@ -123,6 +124,39 @@ print(result['source_code'])
 ---
 
 ### 5. AgentTestExecuteur (`execute_test_agent.py`)
+---
+
+### 6. MemorySystem (`memory_system.py`)
+**Purpose:**
+- Provides persistent or in-memory storage for agent context, history, or other data needed across agent runs.
+
+**Key Methods:**
+- (See source for available methods; typically includes save, load, and update memory functions.)
+
+**Usage Example:**
+```python
+from memory_system import MemorySystem
+memory = MemorySystem()
+memory.save('key', 'value')
+print(memory.load('key'))
+```
+
+---
+
+### 7. GitHubPush (`github_push.py`)
+**Purpose:**
+- Handles pushing generated or modified code to a GitHub repository, automating commits and pushes from agents.
+
+**Key Methods:**
+- (See source for available methods; typically includes functions to commit and push files to GitHub.)
+
+**Usage Example:**
+```python
+from github_push import push_to_github
+push_to_github('output/my_agent.py', repo_url='https://github.com/your/repo.git')
+```
+
+---
 **Purpose:**
 - Test Python code for syntax and runtime errors
 - Install missing imports and report errors in JSON
@@ -143,26 +177,46 @@ print(result)
 ---
 
 ## Installation
+
 1. Clone the repository:
    ```sh
    git clone https://github.com/weldhammadi/multiagent.git
    cd multiagent
    ```
-2. Install dependencies:
+2. Install dependencies (Python 3.8+ recommended):
    ```sh
-   pip install -r hamza/requirements.txt
+   pip install -r requirements.txt
    ```
-3. Set up your `.env` file with your Groq API key and (optionally) GitHub token:
+3. Set up your `.env` file in the project root with your Groq API key and (optionally) GitHub token:
    ```env
    GROQ_API_KEY=your_groq_api_key
    GITHUB_TOKEN=your_github_token
    ```
+   - The `.env` file is required for LLM and GitHub API access.
+   - Place it in the root directory (`multiagent/`).
 
 ---
 
+
 ## Usage Examples
+- **Main entry point:**
+   - To run the orchestrator for end-to-end agent generation from a single prompt:
+      ```sh
+      python main.py
+      ```
+      (Follow the prompts or edit `main.py` as needed.)
 - See the `if __name__ == "__main__"` blocks in each agent file for runnable examples.
-- Use the Orchestrator for end-to-end agent generation from a single prompt.
+- Use the Orchestrator for full agent generation, or import individual agents as shown above.
+
+## Project Structure
+
+- `output/`: Generated agents, code, and environment files are saved here.
+- `prompts/`: Contains prompt templates and context files used by the agents for LLM and tool generation.
+
+## Environment Variables
+- `GROQ_API_KEY`: **Required** for all LLM and AI tasks
+- `GITHUB_TOKEN`: Optional, for authenticated GitHub API access (improves GitHub search rate limits)
+- Place these in a `.env` file at the project root.
 
 ---
 
@@ -172,8 +226,21 @@ print(result)
 
 ---
 
+
 ## Contributing
 Pull requests and issues are welcome! Please document new agents and functions clearly.
+
+### Development
+- Ensure code is tested before submitting PRs.
+- If you add new dependencies, update `requirements.txt`.
+- To run tests (if available):
+   ```sh
+   python execute_test_agent.py
+   ```
+
+## Output & Prompts Folders
+- **output/**: Stores generated agent code, environment files, and results from agent runs.
+- **prompts/**: Contains prompt templates and context files for LLM and tool generation. You can customize these to change agent behavior.
 
 ---
 
