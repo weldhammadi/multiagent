@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 # Import your existing agents
 from tool_agent import ToolAgent
 from advanced_generator import AgentModeles as LLMAgent
+from AgentTestExecuteur import AgentTestExecuteur
 
 
 class Orchestrator:
@@ -214,12 +215,57 @@ class Orchestrator:
         self.generated_llm_functions = generated_llm
         return generated_llm
 
-    def assemble_final_agent(self, agent_name: str = "final_agent") -> Path:
+    def correct_agent(self, code: str, errors: List[str]) -> str:
+        """
+        Sends code and errors to Groq LLM to get corrected code.
+        
+        Args:
+            code: The code with errors
+            errors: List of error messages
+            
+        Returns:
+            Corrected code string
+        """
+        errors_str = "\n".join(errors)
+        
+        context = """Tu es un expert Python. Tu reçois du code Python et une liste d'erreurs.
+Tu dois corriger le code pour éliminer toutes les erreurs.
+Renvoie UNIQUEMENT le code corrigé, sans explication, sans markdown, sans ```python.
+Le code doit être complet et fonctionnel."""
+        
+        prompt = f"""Voici le code Python avec des erreurs:
+
+{code}
+
+Erreurs détectées:
+{errors_str}
+
+Corrige le code pour éliminer ces erreurs. Renvoie UNIQUEMENT le code corrigé."""
+        
+        response = self.tool_agent.call_llm(
+            context=context,
+            user_request=prompt
+        )
+        
+        # Nettoyer la réponse
+        corrected = response.strip()
+        if corrected.startswith("```python"):
+            corrected = corrected[9:]
+        if corrected.startswith("```"):
+            corrected = corrected[3:]
+        if corrected.endswith("```"):
+            corrected = corrected[:-3]
+        
+        return corrected.strip()
+
+    def assemble_final_agent(self, agent_name: str = "final_agent", max_retries: int = 5) -> Path:
         """
         Combines all generated code into a single Python file.
+        Tests the code and retries correction up to max_retries times.
         
         Args:
             agent_name: Filename for the final agent
+            max_retries: Max correction attempts (default 5)
             
         Returns:
             Path to the generated Python file
@@ -227,7 +273,7 @@ class Orchestrator:
         final_path = self.output_dir / f"{agent_name}.py"
 
         # Header avec imports communs
-        imports = '''"""
+        imports = '''"""'
 Auto-generated agent by Orchestrator.
 """
 
@@ -271,6 +317,28 @@ if __name__ == '__main__':
         
         code += main_wrapper
 
+        # Test and correct loop
+        tester = AgentTestExecuteur(timeout=60)
+        
+        for attempt in range(1, max_retries + 1):
+            print(f"\n🧪 Test du code (tentative {attempt}/{max_retries})...")
+            
+            resultat = tester.tester_code(code, description=f"Agent {agent_name}")
+            
+            if resultat["statut"] == "OK":
+                print(f"✅ Code valide! Aucune erreur détectée.")
+                break
+            else:
+                print(f"❌ {len(resultat['erreurs'])} erreur(s) détectée(s):")
+                for err in resultat["erreurs"]:
+                    print(f"   - {err}")
+                
+                if attempt < max_retries:
+                    print(f"\n🔄 Correction du code...")
+                    code = self.correct_agent(code, resultat["erreurs"])
+                else:
+                    print(f"\n⚠️ Max tentatives atteintes ({max_retries}). Sauvegarde du code final malgré les erreurs.")
+        
         final_path.write_text(code, encoding="utf-8")
         print(f"\n📄 Agent final sauvegardé: {final_path}")
         return final_path
@@ -594,7 +662,8 @@ if __name__ == "__main__":
         enable_github_search=False
     )
     
-    user_request = """i want an agent that creates kids stories and saves them as mp4 audio files using text to speech synthesis in French. The agent should create story theme , then generate a creative story accordingly. Finally, it should convert the text story into an engaging audio format suitable for children."""
+    #user_request = """i want an agent that creates kids stories and saves them as mp4 audio files using text to speech synthesis in French. The agent should create story theme , then generate a creative story accordingly. Finally, it should convert the text story into an engaging audio format suitable for children."""
+    user_request = """i want an agent that reads my mails and classify them into categories such as work, personal, spam, and important. The agent should connect to my Gmail account using OAuth2 authentication, fetch unread emails, analyze their content, and categorize them accordingly. Finally, it should generate a summary report of the categorized emails."""
     
     result = orchestrator.run(user_request, agent_name="kids_story_agent")
     
