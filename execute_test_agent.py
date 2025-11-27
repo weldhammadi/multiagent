@@ -88,6 +88,7 @@ class AgentTestExecuteur:
         print(f"\n✅ CODE VALIDE - Aucune erreur")
 
         return resultat
+    
     def _extraire_imports(self, code: str) -> List[str]:
         """
         Extrait les modules importés dans le code (import X, from X import Y).
@@ -123,6 +124,7 @@ class AgentTestExecuteur:
             'secrets', 'zoneinfo', 'graphlib', 'dataclasses', 'contextvars', 'importlib', 'typing_extensions', 'typing'
         }
         return [m for m in modules if m not in stdlib]
+    
     def _installer_modules(self, modules: List[str]):
         """
         Installe les modules via pip si non déjà installés.

@@ -9,7 +9,7 @@ ToolAgent and LLMAgent, and assembles everything into a single Python file.
 import os
 import json
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable
 
 from dotenv import load_dotenv
 
@@ -78,6 +78,26 @@ class Orchestrator:
         self.final_code_parts: List[str] = []
         self.generated_tools: List[Dict[str, Any]] = []
         self.generated_llm_functions: List[Dict[str, Any]] = []
+        
+        # Progress callback for UI updates
+        self._progress_callback: Optional[Callable[[str, str], None]] = None
+    
+    def set_progress_callback(self, callback: Callable[[str, str], None]) -> None:
+        """
+        Set a callback function to receive progress updates.
+        
+        Args:
+            callback: Function that takes (message, level) as arguments.
+                     Level can be: 'info', 'success', 'error', 'warning', 
+                     'progress', 'tool', 'llm', 'plan', 'code', 'file', 'test'
+        """
+        self._progress_callback = callback
+    
+    def _emit_progress(self, message: str, level: str = "info") -> None:
+        """Emit a progress update to the callback if set."""
+        print(message)  # Always print to console
+        if self._progress_callback:
+            self._progress_callback(message, level)
     
     def _load_prompt(self, filename: str) -> str:
         """
@@ -154,9 +174,12 @@ class Orchestrator:
         
         # Charger le template de prompt pour les tools
         prompt_template = self._load_prompt(self.TOOL_PROMPT_FILE)
+        total_tools = len(tools_plan)
         
-        for tool in tools_plan:
-            print(f"\n🔧 Génération du tool: {tool.get('name', 'unknown')}")
+        for idx, tool in enumerate(tools_plan, 1):
+            tool_name = tool.get('name', 'unknown')
+            self._emit_progress(f"🔧 [{idx}/{total_tools}] Generating tool: {tool_name}", "tool")
+            
             # Construire le prompt pour ToolAgent
             inputs_str = json.dumps(tool.get('inputs', {}), indent=2)
             outputs_str = json.dumps(tool.get('outputs', {}), indent=2)
@@ -166,15 +189,16 @@ class Orchestrator:
                 inputs=inputs_str,
                 outputs=outputs_str
             )
-            # Removed ToolAgent.generate_tool input print for cleaner output
+            
             try:
+                self._emit_progress(f"   ⏳ Calling LLM for {tool_name}...", "info")
                 # save_files=False pour ne pas créer de fichiers individuels
                 result = self.tool_agent.generate_tool(user_prompt=prompt, save_files=False)
                 generated_tools.append(result)
                 self.final_code_parts.append(result["source_code"])
-                print(f"   ✓ Tool généré: {result['metadata'].get('nom', 'unknown')}")
+                self._emit_progress(f"   ✅ Tool generated: {result['metadata'].get('nom', tool_name)}", "success")
             except Exception as exc:
-                print(f"   ✗ Erreur génération tool {tool.get('name')}: {exc}")
+                self._emit_progress(f"   ❌ Error generating tool {tool_name}: {exc}", "error")
                 continue
         
         self.generated_tools = generated_tools
@@ -191,25 +215,29 @@ class Orchestrator:
             List of dicts containing code and metadata
         """
         generated_llm = []
+        total_funcs = len(llm_plan)
         
-        for func in llm_plan:
-            print(f"\n🤖 Génération fonction LLM: {func.get('name', 'unknown')}")
-            # Removed JSON input print for cleaner output
+        for idx, func in enumerate(llm_plan, 1):
+            func_name = func.get('name', 'unknown')
+            model_type = func.get('model_type', 'llm')
+            self._emit_progress(f"🤖 [{idx}/{total_funcs}] Generating LLM function: {func_name} (type: {model_type})", "llm")
+            
             try:
+                self._emit_progress(f"   ⏳ Calling LLM for {func_name}...", "info")
                 result = self.llm_agent.generate_model_function(
                     description=func.get("description", ""),
                     inputs=func.get("inputs", {}),
                     outputs=func.get("outputs", {}),
-                    model_type=func.get("model_type", "llm"),
+                    model_type=model_type,
                     constraints=func.get("constraints"),
                     temperature=func.get("temperature", 0.3),
                     max_tokens=func.get("max_tokens", 2048)
                 )
                 generated_llm.append(result)
                 self.final_code_parts.append(result["source_code"])
-                print(f"   ✓ Fonction LLM générée: {result['metadata']['fonction']['nom']}")
+                self._emit_progress(f"   ✅ LLM function generated: {result['metadata']['fonction']['nom']}", "success")
             except Exception as exc:
-                print(f"   ✗ Erreur génération LLM {func.get('name')}: {exc}")
+                self._emit_progress(f"   ❌ Error generating LLM function {func_name}: {exc}", "error")
                 continue
         
         self.generated_llm_functions = generated_llm
@@ -229,9 +257,11 @@ class Orchestrator:
         errors_str = "\n".join(errors)
         
         context = """Tu es un expert Python. Tu reçois du code Python et une liste d'erreurs.
-Tu dois corriger le code pour éliminer toutes les erreurs.
-Renvoie UNIQUEMENT le code corrigé, sans explication, sans markdown, sans ```python.
-Le code doit être complet et fonctionnel."""
+                    Tu dois corriger le code pour éliminer toutes les erreurs.
+                    Renvoie UNIQUEMENT le code corrigé, sans explication, sans markdown, sans ```python.
+                    Le code doit être complet et fonctionnel.
+                    ne oublie pas de mettre tous les imports en haut du fichier pas d'inport entre les fonctions.
+                    organise bien la structure du code sans modifier la logique initiale."""
         
         prompt = f"""Voici le code Python avec des erreurs:
 
@@ -321,26 +351,27 @@ if __name__ == '__main__':
         tester = AgentTestExecuteur(timeout=60)
         
         for attempt in range(1, max_retries + 1):
-            print(f"\n🧪 Test du code (tentative {attempt}/{max_retries})...")
+            self._emit_progress(f"🧪 Testing code (attempt {attempt}/{max_retries})...", "test")
             
             resultat = tester.tester_code(code, description=f"Agent {agent_name}")
             
             if resultat["statut"] == "OK":
-                print(f"✅ Code valide! Aucune erreur détectée.")
+                self._emit_progress(f"✅ Code valid! No errors detected.", "success")
                 break
             else:
-                print(f"❌ {len(resultat['erreurs'])} erreur(s) détectée(s):")
+                self._emit_progress(f"❌ {len(resultat['erreurs'])} error(s) detected", "error")
                 for err in resultat["erreurs"]:
-                    print(f"   - {err}")
+                    self._emit_progress(f"   • {err[:100]}...", "warning")
                 
                 if attempt < max_retries:
-                    print(f"\n🔄 Correction du code...")
+                    self._emit_progress(f"🔄 Correcting code with LLM...", "progress")
                     code = self.correct_agent(code, resultat["erreurs"])
+                    self._emit_progress(f"   Code corrected, retesting...", "info")
                 else:
-                    print(f"\n⚠️ Max tentatives atteintes ({max_retries}). Sauvegarde du code final malgré les erreurs.")
+                    self._emit_progress(f"⚠️ Max attempts reached ({max_retries}). Saving final code despite errors.", "warning")
         
         final_path.write_text(code, encoding="utf-8")
-        print(f"\n📄 Agent final sauvegardé: {final_path}")
+        self._emit_progress(f"📄 Final agent saved: {final_path.name}", "file")
         return final_path
     
     def _collect_env_vars_and_configs(self) -> Dict[str, Any]:
@@ -405,7 +436,7 @@ if __name__ == '__main__':
         env_file = self.output_dir / f"{agent_name}.env"
         
         if env_file.exists():
-            print(f"   ⚠️  {env_file.name} existe déjà, non écrasé")
+            self._emit_progress(f"   ⚠️ {env_file.name} already exists, not overwritten", "warning")
             return env_file
         
         # Générer le contenu avec commentaires
@@ -421,7 +452,7 @@ if __name__ == '__main__':
         lines.append("")  # Ligne vide finale
         
         env_file.write_text("\n".join(lines), encoding="utf-8")
-        print(f"   🔐 {env_file.name} créé (à remplir manuellement)")
+        self._emit_progress(f"   🔐 {env_file.name} created (needs manual configuration)", "file")
         return env_file
     
     def _generate_config_files(self, agent_name: str, config_files: List[str]) -> Dict[str, Path]:
@@ -443,7 +474,7 @@ if __name__ == '__main__':
             config_file = self.output_dir / f"{agent_name}_{clean_name}.json"
             
             if config_file.exists():
-                print(f"   ⚠️  {config_file.name} existe déjà, non écrasé")
+                self._emit_progress(f"   ⚠️ {config_file.name} already exists, not overwritten", "warning")
                 created[clean_name] = config_file
                 continue
             
@@ -471,7 +502,7 @@ if __name__ == '__main__':
                 json.dumps(content, indent=2, ensure_ascii=False) + "\n",
                 encoding="utf-8"
             )
-            print(f"   ⚙️  {config_file.name} créé (à remplir manuellement)")
+            self._emit_progress(f"   ⚙️ {config_file.name} created (needs manual configuration)", "file")
             created[clean_name] = config_file
         
         return created
@@ -489,7 +520,7 @@ if __name__ == '__main__':
         creds_file = self.output_dir / f"{agent_name}_credentials.json"
         
         if creds_file.exists():
-            print(f"   ⚠️  {creds_file.name} existe déjà, non écrasé")
+            self._emit_progress(f"   ⚠️ {creds_file.name} already exists, not overwritten", "warning")
             return creds_file
         
         template = {
@@ -516,7 +547,7 @@ if __name__ == '__main__':
             json.dumps(template, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8"
         )
-        print(f"   🔑 {creds_file.name} créé (template OAuth2 à remplir)")
+        self._emit_progress(f"   🔑 {creds_file.name} created (OAuth2 template needs configuration)", "file")
         return creds_file
     
     def generate_config_files_for_agent(self, agent_name: str) -> Dict[str, Any]:
@@ -529,7 +560,7 @@ if __name__ == '__main__':
         Returns:
             Dict avec les chemins des fichiers créés
         """
-        print("\n📁 Phase 5: Génération des fichiers de configuration...")
+        self._emit_progress("   Generating configuration files...", "info")
         
         # Collecter les requirements
         requirements = self._collect_env_vars_and_configs()
@@ -570,12 +601,13 @@ if __name__ == '__main__':
         Returns:
             Dict with plan, generated tools, llm functions, and final path
         """
-        print("=" * 60)
-        print("🎯 Orchestrator - Génération d'Agent Complet")
-        print("=" * 60)
+        self._emit_progress("=" * 50, "info")
+        self._emit_progress("🎯 Orchestrator - Complete Agent Generation", "info")
+        self._emit_progress("=" * 50, "info")
 
         # Phase 1: Planning
-        print("\n📋 Phase 1: Planification...")
+        self._emit_progress("📋 PHASE 1: Planning agent structure...", "plan")
+        self._emit_progress(f"   Analyzing request: {user_request[:80]}...", "info")
         plan = self.plan_agent(user_request)
 
         # --- Centralize and automate model_type assignment for LLM functions ---
@@ -604,36 +636,45 @@ if __name__ == '__main__':
 
         tools_count = len(plan.get("tools", []))
         llm_count = len(plan.get("llm_functions", []))
-        print(f"   ✓ Plan généré: {tools_count} tools, {llm_count} fonctions LLM")
+        self._emit_progress(f"   ✅ Plan created: {tools_count} tools, {llm_count} LLM functions", "success")
+        
+        # Log planned items
+        for tool in plan.get("tools", []):
+            self._emit_progress(f"   📌 Tool planned: {tool.get('name', 'unknown')}", "info")
+        for func in plan.get("llm_functions", []):
+            self._emit_progress(f"   📌 LLM function planned: {func.get('name', 'unknown')}", "info")
 
         # Phase 2: Generate tools
-        print("\n🔧 Phase 2: Génération des Tools...")
+        self._emit_progress("\n🔧 PHASE 2: Generating Tools...", "progress")
         self.generate_tools(plan.get("tools", []))
+        self._emit_progress(f"   ✅ Generated {len(self.generated_tools)} tools", "success")
 
         # Phase 3: Generate LLM functions
-        print("\n🤖 Phase 3: Génération des Fonctions LLM...")
+        self._emit_progress("\n🤖 PHASE 3: Generating LLM Functions...", "progress")
         self.generate_llm_functions(plan.get("llm_functions", []))
+        self._emit_progress(f"   ✅ Generated {len(self.generated_llm_functions)} LLM functions", "success")
 
         # Phase 4: Assemble
-        print("\n📦 Phase 4: Assemblage...")
+        self._emit_progress("\n📦 PHASE 4: Assembling final agent...", "progress")
         final_path = self.assemble_final_agent(agent_name)
 
         # Phase 5: Generate config files (.env, JSON configs, credentials)
+        self._emit_progress("\n📁 PHASE 5: Generating configuration files...", "progress")
         config_result = self.generate_config_files_for_agent(agent_name)
 
-        print("\n" + "=" * 60)
-        print("🎉 Agent généré avec succès!")
-        print("=" * 60)
+        self._emit_progress("\n" + "=" * 50, "info")
+        self._emit_progress("🎉 Agent generated successfully!", "success")
+        self._emit_progress("=" * 50, "info")
 
         # Afficher un résumé des fichiers créés
-        print("\n📁 Fichiers créés:")
-        print(f"   📄 {final_path}")
+        self._emit_progress("\n📁 Files created:", "file")
+        self._emit_progress(f"   📄 {final_path.name}", "file")
         if config_result.get("env_file"):
-            print(f"   🔐 {config_result['env_file']} (⚠️ à remplir)")
+            self._emit_progress(f"   🔐 {config_result['env_file'].name} (⚠️ needs configuration)", "file")
         if config_result.get("credentials_file"):
-            print(f"   🔑 {config_result['credentials_file']} (⚠️ à remplir)")
+            self._emit_progress(f"   🔑 {config_result['credentials_file'].name} (⚠️ needs configuration)", "file")
         for name, path in config_result.get("config_files", {}).items():
-            print(f"   ⚙️  {path} (⚠️ à remplir)")
+            self._emit_progress(f"   ⚙️ {path.name} (⚠️ needs configuration)", "file")
 
         return {
             "plan": plan,

@@ -835,7 +835,9 @@ class ToolAgent:
             raise RuntimeError("⚠️ Variable GROQ_API_KEY manquante dans .env")
         
         if context_file is None:
-            context_file = Path("prompts/tools_context.txt")
+            # Use path relative to this script's location
+            script_dir = Path(__file__).parent
+            context_file = script_dir / "prompts" / "tools_context.txt"
         
         context = self.load_file_content(context_file)
         response = self.call_llm(context=context, user_request=user_prompt)
@@ -897,7 +899,9 @@ class ToolAgent:
         # Chargement du prompt
         if user_prompt is None:
             if prompt_file is None:
-                prompt_file = Path("prompts/example_prompt.txt")
+                # Use path relative to this script's location
+                script_dir = Path(__file__).parent
+                prompt_file = script_dir / "prompts" / "example_prompt.txt"
             user_prompt = self.load_file_content(prompt_file)
         
         # Phase 1: GitHub (si activé)
