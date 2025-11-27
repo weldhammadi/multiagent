@@ -1,3 +1,0 @@
-Paramètres de sortie (clés du dictionnaire retourné):
-{outputs}
-
