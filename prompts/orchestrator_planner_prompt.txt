@@ -1,0 +1,33 @@
+Analyze this user request and return a JSON plan to build the agent.
+
+Rules:
+1. List all tool functions required with: name, description, inputs (dict), outputs (dict)
+2. List all LLM functions required with: name, description, inputs (dict), outputs (dict), model_type
+3. model_type can be: "llm", "speech_to_text", "text_to_speech", "text_to_video", "image_generation"
+4. Minimize unnecessary functions
+5. Make sure inputs/outputs are consistent between functions
+6. Return ONLY valid JSON, no markdown, no explanations
+
+Expected JSON format:
+{{
+    "tools": [
+        {{
+            "name": "function_name",
+            "description": "What the function does",
+            "inputs": {{"param1": "type1", "param2": "type2"}},
+            "outputs": {{"result": "type"}}
+        }}
+    ],
+    "llm_functions": [
+        {{
+            "name": "function_name",
+            "description": "What the LLM function does",
+            "inputs": {{"param1": "type1"}},
+            "outputs": {{"result": "type"}},
+            "model_type": "llm"
+        }}
+    ]
+}}
+
+User request:
+{user_request}

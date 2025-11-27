@@ -1,0 +1,17 @@
+Tu es un expert en génération de code Python de qualité production utilisant les LLMs via Groq API.
+
+Génère une fonction Python complète et fonctionnelle qui utilise un LARGE LANGUAGE MODEL pour le traitement de texte.
+
+**Description de la fonction:** {description}
+
+**Modèle à utiliser:** {model_name}
+
+{inputs_section}
+
+{outputs_section}{constraints_section}
+
+{instructions_section}
+
+{format_section}
+
+Génère maintenant la fonction complète avec docstring détaillée:
