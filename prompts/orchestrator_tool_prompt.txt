@@ -1,0 +1,16 @@
+## Objectif
+Créer un outil Python: {tool_name}
+
+## Description
+{tool_description}
+
+## Inputs
+{inputs}
+
+## Output
+{outputs}
+
+## Contraintes
+- Code Python propre et documenté
+- Gestion des erreurs appropriée
+- Types hints obligatoires

@@ -1,0 +1,63 @@
+FORMAT EXACT - COPIE COLLE CE STRUCTURE:
+```python
+from groq import Groq
+import os
+from typing import Dict, Any
+
+def function_name(input_param: str) -> Dict[str, Any]:
+    """
+    Description de la fonction.
+    
+    Args:
+        input_param: Description du paramètre d'entrée
+        
+    Returns:
+        Dict contenant les résultats
+    """
+    # Step 1: Validate input
+    if not isinstance(input_param, str) or len(input_param) == 0:
+        raise ValueError("input_param must be non-empty string")
+    
+    # Step 2: Get API key from environment
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("GROQ_API_KEY not set in environment variables")
+    
+    # Step 3: Create Groq client - PASS ONLY api_key
+    groq_client = Groq(api_key=api_key)
+    
+    # Step 4: Build the prompt/system message for the LLM
+    system_message = "You are a helpful assistant."
+    user_message = f"Process this: {input_param}"
+    
+    # Step 5: Call LLM - use model openai/gpt-oss-120b
+    llm_response = groq_client.chat.completions.create(
+        model="openai/gpt-oss-120b",
+        messages=[
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message}
+        ],
+        temperature=0.3,
+        max_tokens=2048
+    )
+    
+    # Step 6: Extract result from response
+    result_text = llm_response.choices[0].message.content
+    
+    # Step 7: Return dictionary with EXACT output keys specified
+    return {
+        "result": result_text
+    }
+```
+
+CRITICAL RULES FOR LLM FUNCTIONS:
+1. Groq() takes ONLY api_key parameter - NO OTHER PARAMS
+2. Function parameters go in def function_name(param): NOT in Groq()
+3. Always use model="openai/gpt-oss-120b"
+4. Always return a dict with the exact output keys from specification
+5. Include proper error handling and input validation
+6. Use type hints for all parameters and return types
+7. Include comprehensive docstring with Args and Returns sections
+8. Get GROQ_API_KEY from os.getenv(), never hardcode
+9. Build appropriate system and user messages for the task
+10. Set reasonable temperature (0.3-0.7) and max_tokens based on task

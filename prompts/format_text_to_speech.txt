@@ -1,41 +1,39 @@
 FORMAT EXACT POUR TEXT-TO-SPEECH - SUIT CETTE STRUCTURE:
-```python
 from groq import Groq
 import os
 import base64
 
-def generate_speech(text, voice="alloy", speed=1.0, output_format="mp3"):
+def generate_speech(text: str, voice: str = "alloy", speed: float = 1.0, output_format: str = "mp3") -> dict:
     """
-    Génère un fichier audio depuis du texte en utilisant PlayAI TTS.
-    
+    Generate an audio file from text using PlayAI TTS.
     Args:
-        text: Texte à convertir en parole (str)
-        voice: Nom de la voix à utiliser (str)
-        speed: Vitesse de parole (0.25 à 4.0, défaut 1.0)
-        output_format: Format audio de sortie ('mp3', 'opus', 'aac', 'flac')
-    
+        text: Text to convert to speech (str)
+        voice: Voice name to use (str)
+        speed: Speech speed (0.25 to 4.0, default 1.0)
+        output_format: Output audio format ('mp3', 'opus', 'aac', 'flac')
     Returns:
-        dict avec clés:
-            - audio_base64: Audio encodé en base64
-            - format: Format du fichier audio
-            - text_length: Nombre de caractères du texte
-            - voice_used: Voix utilisée
+        dict with keys:
+            - audio_base64: Audio encoded in base64
+            - format: Audio file format
+            - text_length: Number of characters in text
+            - voice_used: Voice used
     """
     # Step 1: Validate input
     if not isinstance(text, str) or len(text) == 0:
         raise ValueError("text must be non-empty string")
-    
     if not 0.25 <= speed <= 4.0:
         raise ValueError("speed must be between 0.25 and 4.0")
-    
+    if output_format not in ("mp3", "opus", "aac", "flac"):
+        raise ValueError("output_format must be one of: mp3, opus, aac, flac")
+
     # Step 2: Get API key
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise ValueError("GROQ_API_KEY not set")
-    
+
     # Step 3: Create Groq client
     client = Groq(api_key=api_key)
-    
+
     # Step 4: Generate speech
     response = client.audio.speech.create(
         model="playai-tts",
@@ -44,11 +42,18 @@ def generate_speech(text, voice="alloy", speed=1.0, output_format="mp3"):
         speed=speed,
         response_format=output_format
     )
-    
+
     # Step 5: Encode audio to base64
-    audio_bytes = response.content
+    # Use write_to_file or .read() depending on SDK version
+    try:
+        audio_bytes = response.read()
+    except AttributeError:
+        try:
+            audio_bytes = response.content
+        except AttributeError:
+            raise RuntimeError("Groq TTS response does not have .read() or .content. Check SDK version.")
     audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
-    
+
     # Step 6: Return structured result
     return {
         "audio_base64": audio_base64,
@@ -56,11 +61,34 @@ def generate_speech(text, voice="alloy", speed=1.0, output_format="mp3"):
         "text_length": len(text),
         "voice_used": voice
     }
-```
 
-RÈGLES CRITIQUES TEXT-TO-SPEECH:
-- Utiliser client.audio.speech.create()
-- Model DOIT être "playai-tts"
-- Valider la vitesse (0.25-4.0)
-- Encoder l'audio en base64 pour le retour
-- Supporter les formats: mp3, opus, aac, flac
+# RÈGLES CRITIQUES TEXT-TO-SPEECH:
+# - Utiliser client.audio.speech.create()
+# - Model DOIT être "playai-tts"
+# - Valider la vitesse (0.25-4.0)
+# - Encoder l'audio en base64 pour le retour
+# - Supporter les formats: mp3, opus, aac, flac
+
+
+
+example of use groq
+
+import os
+from groq import Groq
+
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+speech_file_path = "speech.wav" 
+model = "playai-tts"
+voice = "Fritz-PlayAI"
+text = "I love building and shipping new features for our users!"
+response_format = "wav"
+
+response = client.audio.speech.create(
+    model=model,
+    voice=voice,
+    input=text,
+    response_format=response_format
+)
+
+response.write_to_file(speech_file_path)
