@@ -252,81 +252,38 @@ class MemoryManager:
     def generate_report(self) -> str:
         """Génère un rapport lisible de la mémoire"""
         stats = self.memory["statistics"]
-        
-        report = f"""
-╔══════════════════════════════════════════════════════════════╗
-║           RAPPORT MÉMOIRE DU SYSTÈME MULTI-AGENTS            ║
-╚══════════════════════════════════════════════════════════════╝
-
-📊 STATISTIQUES GLOBALES
-{'─' * 64}
-   Outils générés:              {stats['total_tools']}
-   Modèles configurés:          {stats['total_models']}
-   Agents créés:                {stats['total_agents']}
-   Déploiements réussis:        {stats['successful_deployments']}
-   Déploiements échoués:        {stats['failed_deployments']}
-
-🔧 OUTILS DISPONIBLES
-{'─' * 64}
-"""
-        
+        report = (
+            "╔═════════════════════════════════════════════╗\n"
+            "║   RAPPORT MÉMOIRE DU SYSTÈME MULTI-AGENTS   ║\n"
+            "╚═════════════════════════════════════════════╝\n"
+            f"📊 STATISTIQUES\n{'─'*40}\n"
+            f"Outils: {stats['total_tools']} | Modèles: {stats['total_models']} | Agents: {stats['total_agents']} | OK: {stats['successful_deployments']} | Échecs: {stats['failed_deployments']}\n"
+            f"🔧 OUTILS\n{'─'*40}\n"
+        )
         for name, tool in self.memory["tools"].items():
-            report += f"\n   • {name}\n"
-            report += f"     └─ {tool['description'][:60]}...\n"
-            report += f"        Utilisé dans: {len(tool['used_in_agents'])} agent(s)\n"
-        
-        report += f"\n\n🤖 AGENTS CRÉÉS\n{'─' * 64}\n"
-        
+            report += f"• {name}: {tool['description'][:40]}... | {len(tool['used_in_agents'])} agent(s)\n"
+
+        # MODÈLES
+        report += f"🧠 MODÈLES\n{'─'*40}\n"
+        if self.memory["models"]:
+            for key, model in self.memory["models"].items():
+                used_in = model.get('used_in_agents', [])
+                used_str = ', '.join(used_in) if used_in else 'aucun agent'
+                report += f"• {model['model_name']} ({model['provider']}, {model['purpose']}) | {used_str}\n"
+        else:
+            report += "(Aucun modèle)\n"
+
+        report += f"🤖 AGENTS\n{'─'*40}\n"
         for name, agent in self.memory["agents"].items():
             status_emoji = "✅" if agent['status'] == 'deployed' else "❌"
-            report += f"\n   {status_emoji} {name}\n"
-            report += f"     └─ Type: {agent['agent_type']}\n"
-            report += f"        Outils: {len(agent['tools_used'])}, Modèles: {len(agent['models_used'])}\n"
+            report += f"{status_emoji} {name} | Type: {agent['agent_type']} | Outils: {len(agent['tools_used'])} | Modèles: {len(agent['models_used'])}\n"
             if agent.get('render_url'):
-                report += f"        URL: {agent['render_url']}\n"
-        
-        report += f"\n{'═' * 64}\n"
-        report += f"Dernière mise à jour: {self.memory['last_updated']}\n"
-        report += f"{'═' * 64}\n"
-        
+                report += f"  URL: {agent['render_url']}\n"
+
+        report += f"{'═'*40}\n"
+        report += f"Maj: {self.memory['last_updated']}\n"
+        report += f"{'═'*40}\n"
         return report
-
-
-class MemoryAnalyzer:
-    """Analyse la mémoire pour optimiser les futures générations"""
-    
-    def __init__(self, memory_manager: MemoryManager):
-        self.memory = memory_manager
-    
-    def suggest_reusable_components(self, requirements: Dict[str, Any]) -> Dict[str, List]:
-        """
-        Suggère des composants réutilisables pour une nouvelle demande.
-        
-        Args:
-            requirements: Spécifications du nouvel agent
-            
-        Returns:
-            Dictionnaire avec suggestions de tools et models
-        """
-        suggestions = {
-            'tools': [],
-            'models': []
-        }
-        
-        # Rechercher des outils similaires
-        description = requirements.get('description', '')
-        similar_tools = self.memory.get_reusable_tools(description)
-        
-        suggestions['tools'] = [
-            {
-                'name': tool.name,
-                'description': tool.description,
-                'reuse_confidence': 0.8  # Score de confiance
-            }
-            for tool in similar_tools
-        ]
-        
-        return suggestions
     
     def identify_patterns(self) -> Dict[str, Any]:
         """Identifie les patterns dans les agents créés"""

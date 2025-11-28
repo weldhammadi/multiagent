@@ -101,7 +101,7 @@ def commit_and_push(message: str, branch: str, cwd: Path, dry_run: bool = False)
         current = get_current_branch(cwd)
         if current != branch:
             switch_or_create_branch(branch, cwd)
-        run_cmd(["git", "push", GIT_REMOTE, branch], cwd)
+        run_cmd(["git", "push", GIT_REMOTE, branch,"--force"], cwd)
         print(f"Push effectué sur {GIT_REMOTE}/{branch}.")
         return True
     except subprocess.CalledProcessError as e:
@@ -134,12 +134,21 @@ def push_project(commit_message: str = "Mise à jour complète du projet multi-a
         # Write strict .gitignore
         with open(original_gitignore, "w", encoding="utf-8") as f:
             f.write(strict_gitignore_content)
-        # Remove all from index, add only output
-        run_cmd(["git", "rm", "-r", "--cached", "."], GIT_CWD)
+        # Always reset index to HEAD to avoid staged/index conflicts
+        run_cmd(["git", "reset"], GIT_CWD)
+        # Stage and commit all changes in output/ before switching branches
         run_cmd(["git", "add", "output", ".gitignore"], GIT_CWD)
-        # Switch to results branch for push
+        if has_changes(GIT_CWD):
+            try:
+                run_cmd(["git", "commit", "-m", "Auto-commit output before branch switch"], GIT_CWD)
+            except subprocess.CalledProcessError:
+                pass  # Ignore if nothing to commit
+        # Now switch to results branch for push
         if current_branch != branch:
             switch_or_create_branch(branch, GIT_CWD)
+        # Remove all from index, add only output (force if needed)
+        run_cmd(["git", "rm", "-r", "--cached", "."], GIT_CWD, check=False)
+        run_cmd(["git", "add", "output", ".gitignore"], GIT_CWD)
         result = commit_and_push(commit_message, branch, GIT_CWD, dry_run=dry_run)
     except subprocess.CalledProcessError as e:
         print(f"Erreur lors du push global: {e}\nSTDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}")
