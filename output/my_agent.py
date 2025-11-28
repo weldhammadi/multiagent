@@ -1,6 +1,9 @@
+"""
+Auto-generated agent by Orchestrator.
+"""
+
 import os
 import json
-import sys
 import requests
 from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
@@ -10,95 +13,55 @@ from groq import Groq
 load_dotenv()
 
 
-def fetch_weather(location: str) -> Dict:
-    """Retrieve current weather data for a given location using the OpenWeatherMap API.
+def generate_children_story(topic: str) -> Dict[str, Any]:
+    """
+    Generate a short, engaging children's story based on a given topic using the
+    Groq LLM (model ``openai/gpt-oss-120b``).
+
+    The function validates the input, retrieves the Groq API key from the
+    environment, calls the model with a carefully crafted prompt and returns the
+    story text.
 
     Args:
-        location (str): Name of the city or location (e.g., "Paris,FR").
+        topic: A non‑empty string describing the theme, character, or setting of
+               the desired story (e.g. ``"a brave rabbit"``, ``"the magic forest"``).
 
     Returns:
-        Dict: Parsed JSON response containing weather information.
+        Dict[str, Any]: A dictionary containing the generated story.
+            - ``story`` (str): The full text of the children's story produced by
+              the LLM.
 
     Raises:
-        RuntimeError: If the required environment variable is missing, the request fails,
-            or the API returns a non‑successful status code.
+        ValueError: If ``topic`` is not a non‑empty string or the ``GROQ_API_KEY``
+                    environment variable is missing.
+        RuntimeError: If the request to the Groq API fails for any reason.
     """
-    api_key: str | None = os.getenv("OPENWEATHER_API_KEY")
-    if api_key is None:
-        raise RuntimeError("La variable d'environnement OPENWEATHER_API_KEY est manquante.")
+    # Step 1 – Input validation
+    if not isinstance(topic, str) or not topic.strip():
+        raise ValueError("`topic` must be a non‑empty string.")
 
-    endpoint: str = "https://api.openweathermap.org/data/2.5/weather"
-    params: Dict[str, str] = {
-        "q": location,
-        "appid": api_key,
-        "units": "metric",
-    }
-
-    try:
-        response = requests.get(endpoint, params=params, timeout=10)
-    except requests.RequestException as exc:
-        raise RuntimeError(f"Erreur lors de la requête vers OpenWeatherMap: {exc}") from exc
-
-    if response.status_code != 200:
-        raise RuntimeError(
-            f"OpenWeatherMap a renvoyé le statut {response.status_code}: {response.text}"
-        )
-
-    try:
-        weather_data: Dict = response.json()
-    except ValueError as exc:
-        raise RuntimeError("Impossible de décoder la réponse JSON du service météo.") from exc
-
-    return weather_data
-
-
-def generate_weather_summary(weather_data: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Generate a natural‑language summary of the provided weather data using the
-    ``openai/gpt-oss-120b`` model via the Groq API.
-
-    The function validates the input, builds a concise prompt, calls the LLM,
-    and returns the generated summary.
-
-    Args:
-        weather_data (Dict[str, Any]): A dictionary containing weather
-            information (e.g., temperature, humidity, wind, forecast). The
-            dictionary must not be empty and must be JSON‑serialisable.
-
-    Returns:
-        Dict[str, Any]: A dictionary with a single key:
-            - ``summary`` (str): The natural‑language summary produced by the
-              model.
-
-    Raises:
-        ValueError: If ``weather_data`` is not a dict, is empty, or cannot be
-            JSON‑serialised.
-        RuntimeError: If the Groq API call fails or returns an unexpected
-            response.
-    """
-    if not isinstance(weather_data, dict):
-        raise ValueError("weather_data must be a dictionary.")
-    if not weather_data:
-        raise ValueError("weather_data must not be empty.")
-
-    try:
-        weather_json: str = json.dumps(weather_data, ensure_ascii=False, indent=2)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("weather_data contains non‑serialisable values.") from exc
-
-    api_key: str | None = os.getenv("GROQ_API_KEY")
+    # Step 2 – Retrieve API key
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        raise ValueError("GROQ_API_KEY not set in environment variables.")
+        raise ValueError("Environment variable `GROQ_API_KEY` is not set.")
 
-    groq_client = Groq(api_key=api_key)
+    # Step 3 – Initialise Groq client (only the api_key is passed)
+    try:
+        groq_client = Groq(api_key=api_key)
+    except Exception as exc:
+        raise RuntimeError(f"Failed to initialise Groq client: {exc}") from exc
 
+    # Step 4 – Build the prompt
     system_message = (
-        "You are a concise and friendly weather analyst. "
-        "Summarise the provided weather data in natural language, "
-        "highlighting the most relevant details for a general audience."
+        "You are a creative children's author. Write vivid, age‑appropriate "
+        "stories that spark imagination and convey gentle lessons."
     )
-    user_message = f"Weather data:\n{weather_json}\n\nProvide a short summary."
+    user_message = (
+        f"Write a short, engaging children's story (about 200‑300 words) about: "
+        f"{topic.strip()}."
+    )
 
+    # Step 5 – Call the LLM
     try:
         llm_response = groq_client.chat.completions.create(
             model="openai/gpt-oss-120b",
@@ -106,30 +69,30 @@ def generate_weather_summary(weather_data: Dict[str, Any]) -> Dict[str, Any]:
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": user_message},
             ],
-            temperature=0.5,
-            max_tokens=300,
+            temperature=0.6,
+            max_tokens=500,
         )
     except Exception as exc:
-        raise RuntimeError("Failed to obtain a response from Groq API.") from exc
+        raise RuntimeError(f"Groq API request failed: {exc}") from exc
 
+    # Step 6 – Extract the story text
     try:
-        summary: str = llm_response.choices[0].message.content.strip()
+        story_text: str = llm_response.choices[0].message.content.strip()
     except (AttributeError, IndexError) as exc:
-        raise RuntimeError("Unexpected response structure from Groq API.") from exc
+        raise RuntimeError("Unexpected response format from Groq API.") from exc
 
-    return {"summary": summary}
+    # Step 7 – Return the result
+    return {"story": story_text}
 
+
+# =============================================================================
+# MAIN
+# =============================================================================
 
 if __name__ == '__main__':
-    # Ensure stdout can handle Unicode characters on Windows
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except AttributeError:
-        pass  # Fallback for environments where reconfigure is unavailable
-
-    print("🚀 Running my_agent...")
+    print("Running my_agent...")
     # TODO: Implement main workflow here
     # Available functions:
-    # - fetch_weather()
-    # - generate_weather_summary()
+    # - generate_children_story()
+    # - generated_function()  # placeholder for future implementation
     pass
