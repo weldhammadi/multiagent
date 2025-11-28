@@ -1,20 +1,32 @@
+"""
+Auto-generated agent by Orchestrator.
+"""
+
+from __future__ import annotations
+
 import os
 import json
-import requests
 import logging
 from typing import Dict, Any, List, Optional, Literal
-from dotenv import load_dotenv
 
+import requests
+from dotenv import load_dotenv
 from groq import Groq
 
 # Load environment variables
 load_dotenv()
 
 # --------------------------------------------------------------------------- #
-# Configuration & constants
+# CONSTANTS (no magic numbers)
 # --------------------------------------------------------------------------- #
+MODEL_NAME: str = "openai/gpt-oss-120b"
+TEMPERATURE: float = 0.6          # balanced creativity / determinism
+MAX_TOKENS_PER_WORD: int = 2      # rough estimate: 1 word ≈ 2 tokens
+MIN_LENGTH: int = 10              # enforce a minimal story length
+MAX_LENGTH: int = 2000            # safeguard against excessively large requests
 
-SUPPORTED_VOICES = [
+# Supported PlayAI voices (as documented by Groq)
+SUPPORTED_VOICES: List[str] = [
     "Aaliyah-PlayAI",
     "Adelaide-PlayAI",
     "Angelo-PlayAI",
@@ -44,15 +56,13 @@ SUPPORTED_VOICES = [
     "Thunder-PlayAI",
 ]
 
-SUPPORTED_FORMATS = ("mp3", "opus", "aac", "flac", "wav")
-GROQ_TTS_MODEL = "openai/gpt-oss-120b"
+AudioFormat = Literal["mp3", "opus", "aac", "flac", "wav"]
 
 # --------------------------------------------------------------------------- #
-# Logging configuration
+# Logging configuration (application‑wide, can be overridden by the caller)
 # --------------------------------------------------------------------------- #
-
 LOGGER = logging.getLogger(__name__)
-if not LOGGER.handlers:
+if not LOGGER.handlers:  # Prevent duplicate handlers in interactive sessions
     handler = logging.StreamHandler()
     formatter = logging.Formatter(
         fmt="%(asctime)s %(levelname)s %(name)s – %(message)s",
@@ -63,9 +73,29 @@ if not LOGGER.handlers:
     LOGGER.setLevel(logging.INFO)
 
 
-def write_audio_file(audio_bytes: bytes, file_path: str) -> str:
-    """Write audio data to a file and return its absolute path."""
-    directory = os.path.dirname(file_path)
+def save_audio_file(audio_bytes: bytes, filename: str) -> str:
+    """Write audio data to a file and return its absolute path.
+
+    Args:
+        audio_bytes (bytes): The raw audio data to be written.
+        filename (str): Desired file name (may include a relative path).
+
+    Returns:
+        str: Absolute path to the written file.
+
+    Raises:
+        RuntimeError: If ``audio_bytes`` is empty, ``filename`` is empty, or the file
+            cannot be written for any reason.
+    """
+    if not isinstance(audio_bytes, (bytes, bytearray)):
+        raise RuntimeError("Le paramètre audio_bytes doit être de type bytes.")
+    if not audio_bytes:
+        raise RuntimeError("Le contenu audio_bytes est vide.")
+    if not isinstance(filename, str) or not filename:
+        raise RuntimeError("Le paramètre filename doit être une chaîne non vide.")
+
+    file_path: str = os.path.abspath(filename)
+    directory: str = os.path.dirname(file_path)
     if directory and not os.path.isdir(directory):
         try:
             os.makedirs(directory, exist_ok=True)
@@ -76,116 +106,150 @@ def write_audio_file(audio_bytes: bytes, file_path: str) -> str:
         with open(file_path, "wb") as f:
             f.write(audio_bytes)
     except OSError as exc:
-        raise RuntimeError(f"Échec de l'écriture du fichier audio à '{file_path}': {exc}")
+        raise RuntimeError(f"Échec de l'écriture du fichier audio '{file_path}': {exc}")
 
-    return os.path.abspath(file_path)
+    return file_path
 
 
-def generate_children_story(theme: str, length_words: int) -> Dict[str, Any]:
-    """Generate a children's story using the Groq LLM."""
-    if not isinstance(theme, str) or not theme.strip():
-        raise ValueError("`theme` must be a non‑empty string.")
-    if not isinstance(length_words, int) or length_words <= 0:
-        raise ValueError("`length_words` must be a positive integer.")
+def generate_children_story(topic: str, length: int) -> Dict[str, Any]:
+    """
+    Generate a short children's story using a Large Language Model (LLM) hosted on Groq.
 
-    api_key = os.getenv("GROQ_API_KEY")
+    Args:
+        topic (str): The central theme or subject of the story.
+        length (int): Desired length of the story in **words**.
+
+    Returns:
+        Dict[str, Any]: ``{"story": <str>}`` containing the generated story.
+
+    Raises:
+        ValueError: If inputs are invalid.
+        RuntimeError: If the Groq API call fails.
+    """
+    if not isinstance(topic, str) or not topic.strip():
+        raise ValueError("`topic` must be a non‑empty string.")
+    if not isinstance(length, int):
+        raise ValueError("`length` must be an integer.")
+    if not (MIN_LENGTH <= length <= MAX_LENGTH):
+        raise ValueError(
+            f"`length` must be between {MIN_LENGTH} and {MAX_LENGTH} words (got {length})."
+        )
+
+    api_key: Optional[str] = os.getenv("GROQ_API_KEY")
     if not api_key:
-        raise RuntimeError("Environment variable `GROQ_API_KEY` is not set.")
+        raise ValueError(
+            "Environment variable `GROQ_API_KEY` is not set. Please configure your Groq API key."
+        )
 
     groq_client = Groq(api_key=api_key)
 
     system_message = (
         "You are a creative children's author. Write engaging, age‑appropriate "
-        "stories with vivid imagination, simple language, and a positive moral."
+        "stories that spark imagination."
     )
     user_message = (
-        f"Write a children's story about \"{theme}\" that is approximately "
-        f"{length_words} words long. The story should have a clear beginning, "
-        f"middle, and end, and be suitable for readers aged 4‑8."
+        f"Write a children's story about **{topic}** that is approximately "
+        f"{length} words long. The story should have a clear beginning, middle, "
+        f"and end, and should be suitable for children aged 4‑8."
     )
-
-    estimated_tokens = int(length_words * 0.75) + 100
-    max_tokens = min(estimated_tokens, 4096)
 
     try:
         llm_response = groq_client.chat.completions.create(
-            model="openai/gpt-oss-120b",
+            model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": user_message},
             ],
-            temperature=0.6,
-            max_tokens=max_tokens,
+            temperature=TEMPERATURE,
+            max_tokens=length * MAX_TOKENS_PER_WORD,
         )
     except Exception as exc:
         raise RuntimeError(f"Failed to generate story via Groq API: {exc}") from exc
 
     try:
-        story_text = llm_response.choices[0].message.content.strip()
+        story: str = llm_response.choices[0].message.content.strip()
     except (AttributeError, IndexError) as exc:
-        raise RuntimeError("Unexpected response format from Groq API.") from exc
+        raise RuntimeError(
+            "Unexpected response structure from Groq API; unable to extract story."
+        ) from exc
 
-    return {"story_text": story_text}
+    return {"story": story}
 
 
-def convert_story_to_audio(
-    story_text: str,
-    *,
+def synthesize_story(
+    story: str,
     voice: str = "Aaliyah-PlayAI",
     speed: float = 1.0,
-    output_format: Literal["mp3", "opus", "aac", "flac", "wav"] = "mp3",
+    response_format: AudioFormat = "mp3",
 ) -> Dict[str, bytes]:
-    """Convert a story text into spoken audio bytes using Groq PlayAI TTS."""
-    if not isinstance(story_text, str) or not story_text.strip():
-        raise ValueError("`story_text` must be a non‑empty string.")
+    """
+    Convert a story text into spoken audio bytes using Groq's PlayAI‑TTS model.
 
+    Args:
+        story: The narrative to be spoken.
+        voice: One of the voices listed in ``SUPPORTED_VOICES``.
+        speed: Speech speed multiplier (0.25‑4.0).
+        response_format: Desired audio container format.
+
+    Returns:
+        dict: ``{"audio_bytes": <bytes>}``.
+
+    Raises:
+        ValueError: If validation fails or the API key is missing.
+        RuntimeError: If the Groq API call fails.
+    """
+    if not isinstance(story, str) or not story.strip():
+        raise ValueError("`story` must be a non‑empty string.")
     if voice not in SUPPORTED_VOICES:
         raise ValueError(f"`voice` must be one of the supported voices: {SUPPORTED_VOICES}")
-
     if not isinstance(speed, (int, float)):
         raise ValueError("`speed` must be a numeric type.")
-    if not 0.25 <= speed <= 4.0:
+    if not 0.25 <= float(speed) <= 4.0:
         raise ValueError("`speed` must be between 0.25 and 4.0 (inclusive).")
+    if response_format not in ("mp3", "opus", "aac", "flac", "wav"):
+        raise ValueError("`response_format` must be one of: mp3, opus, aac, flac, wav.")
 
-    if output_format not in SUPPORTED_FORMATS:
-        raise ValueError(
-            f"`output_format` must be one of {SUPPORTED_FORMATS}, got '{output_format}'."
-        )
-
-    api_key = os.getenv("GROQ_API_KEY")
+    api_key: Optional[str] = os.getenv("GROQ_API_KEY")
     if not api_key:
-        raise ValueError("Environment variable `GROQ_API_KEY` is not set.")
+        raise ValueError("Environment variable `GROQ_API_KEY` is not set or empty.")
 
-    client = Groq(api_key=api_key)
+    try:
+        client = Groq(api_key=api_key)
+    except Exception as exc:
+        LOGGER.exception("Failed to initialise Groq client.")
+        raise RuntimeError("Could not create Groq client.") from exc
 
     try:
         response = client.audio.speech.create(
-            model=GROQ_TTS_MODEL,
-            input=story_text,
+            model="openai/gpt-oss-120b",
+            input=story,
             voice=voice,
-            speed=speed,
-            response_format=output_format,
+            speed=float(speed),
+            response_format=response_format,
         )
     except Exception as exc:
-        LOGGER.error("Groq TTS request failed: %s", exc)
-        raise
+        LOGGER.exception("Groq TTS request failed.")
+        raise RuntimeError("Error while calling Groq TTS endpoint.") from exc
 
-    # The Groq SDK returns the raw audio bytes in the `audio` attribute.
     try:
-        audio_bytes = response.audio
-    except AttributeError as exc:
-        raise RuntimeError("Failed to retrieve audio bytes from Groq response.") from exc
+        audio_bytes: bytes = response.content  # type: ignore[attr-defined]
+    except Exception as exc:
+        raise RuntimeError("Failed to extract audio bytes from Groq response.") from exc
 
     return {"audio_bytes": audio_bytes}
 
 
+# =============================================================================
+# MAIN
+# =============================================================================
 if __name__ == "__main__":
-    LOGGER.info("🚀 Running my_agent...")
-    # Example workflow (can be replaced with actual logic)
+    print("Running my_agent...")
+    # Example usage (can be replaced with real workflow)
     try:
-        story = generate_children_story("friendship in the forest", 200)
-        audio_result = convert_story_to_audio(story["story_text"])
-        file_path = write_audio_file(audio_result["audio_bytes"], "output/story.mp3")
-        LOGGER.info("Audio file saved to %s", file_path)
+        story_data = generate_children_story(topic="a brave rabbit", length=150)
+        story_text = story_data["story"]
+        tts_result = synthesize_story(story=story_text, voice="Fritz-PlayAI")
+        audio_path = save_audio_file(tts_result["audio_bytes"], "output/story.mp3")
+        print(f"Story saved to: {audio_path}")
     except Exception as e:
-        LOGGER.exception("An error occurred: %s", e)
+        LOGGER.error("An error occurred: %s", e)
